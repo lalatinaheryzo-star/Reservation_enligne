@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/static/css/main.46eb2e73.css",
+    "main.js": "/static/js/main.e94872bb.js",
+    "static/media/reservation-logo-madagascar.png": "/static/media/reservation-logo-madagascar.15ebcec2f6308c06419f.png",
+    "static/media/taxi-brousse-hero.jpg": "/static/media/taxi-brousse-hero.2f795be191c6036a84a7.jpg",
+    "index.html": "/index.html",
+    "main.46eb2e73.css.map": "/static/css/main.46eb2e73.css.map",
+    "main.e94872bb.js.map": "/static/js/main.e94872bb.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.46eb2e73.css",
+    "static/js/main.e94872bb.js"
+  ]
+}
