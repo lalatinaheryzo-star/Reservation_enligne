@@ -6,7 +6,7 @@
 //  Définissez l'URL de l'API dans un fichier .env à la racine
 //  du frontend :  REACT_APP_API_URL=http://localhost:4000/api
 // ============================================================
-const API_URL = process.env.REACT_APP_API_URL || "https://manao-backend.onrender.com/api";
+const API_URL = process.env.REACT_APP_API_URL || "https://serveur-springboot.onrender.com/api";
 const TOKEN_KEY = "voyagemada_token";
 
 export { API_URL };
