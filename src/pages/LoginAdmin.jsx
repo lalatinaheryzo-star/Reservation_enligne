@@ -51,9 +51,6 @@ export default function LoginAdmin({ onLogin, onBack }) {
           <button className="auth-back-btn" onClick={onBack}>
             <ArrowLeft size={14}/> Retour à l'accueil
           </button>
-          <div style={{ background:"#f0fdf4", border:"1px solid #86efac", borderRadius:8, padding:"10px 14px", marginBottom:16, fontSize:".8rem", color:"#166534" }}>
-            <strong>Créer le compte admin :</strong> lancez <code>npm run seed:admin</code> depuis la racine du projet.
-          </div>
           <form onSubmit={handleSubmit}>
             <div className="form-group" style={{ marginBottom:14 }}>
               <label>Adresse e-mail <span className="req">*</span></label>

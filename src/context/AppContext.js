@@ -20,8 +20,16 @@ export function AppProvider({ children }) {
   const [loading,        setLoading]        = useState(true);
 
   // ── Phase 1 : données publiques (sans token) ─────────────
+  // ── Phase 1 : données publiques (sans token) ─────────────
+  // hasLoadedOnceRef évite que le rafraîchissement automatique (toutes les
+  // 2s, voir plus bas) ne repasse "loading" à true à chaque fois : c'est ce
+  // qui faisait clignoter la liste des voyages (elle disparaissait puis
+  // réapparaissait en boucle). Le spinner ne doit s'afficher qu'au tout
+  // premier chargement, jamais lors des rafraîchissements en arrière-plan.
+  const hasLoadedOnceRef = React.useRef(false);
+
   const loadPublic = useCallback(async () => {
-    setLoading(true);
+    if (!hasLoadedOnceRef.current) setLoading(true);
     try {
       const [v, c] = await Promise.allSettled([
         svc.getVoyages(),
@@ -32,6 +40,7 @@ export function AppProvider({ children }) {
     } catch (err) {
       console.error("[AppContext] loadPublic:", err);
     } finally {
+      hasLoadedOnceRef.current = true;
       setLoading(false);
     }
   }, []);
@@ -73,14 +82,32 @@ export function AppProvider({ children }) {
   const loadMyReservations = useCallback(async () => {
     try {
       const list = await svc.getReservations();
-      setReservations(list || []);
+      const normalized = list || [];
+      setReservations(normalized);
+      return normalized;
     } catch (err) {
       console.error("[AppContext] loadMyReservations:", err);
+      return null;
     }
   }, []);
 
-  // Au démarrage : seulement les données publiques
+  // Au démarrage : seulement les données publiques.
   useEffect(() => { loadPublic(); }, [loadPublic]);
+
+  // Actualisation automatique des voyages/coops (données publiques, partagées
+  // par les 3 espaces) au rythme le plus court possible.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") loadPublic();
+    };
+
+    const timer = window.setInterval(refresh, 2000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [loadPublic]);
 
   // ── COOPÉRATIVES ─────────────────────────────────────────
   const addCooperative = async (data) => {

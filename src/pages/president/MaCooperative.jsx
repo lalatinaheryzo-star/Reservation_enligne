@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { Building2, Phone, Mail, MapPin, Pencil, X, Bell } from "lucide-react";
-import toast from "react-hot-toast";
 import { usePresidentContext } from "../../context/PresidentContext";
 
-export default function MaCooperative({ cooperative, isRealSession }) {
-  const { updateCooperative, updateMyCooperativeReal } = usePresidentContext();
+export default function MaCooperative({ cooperative }) {
+  const { updateMyCooperativeReal } = usePresidentContext();
   const [modal, setModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(cooperative || {});
@@ -19,10 +18,6 @@ export default function MaCooperative({ cooperative, isRealSession }) {
 
   const handleSaveRappel = async (e) => {
     e.preventDefault();
-    if (!isRealSession) {
-      toast.error("Disponible uniquement en session connectée au backend.");
-      return;
-    }
     setSavingRappel(true);
     try {
       await updateMyCooperativeReal(cooperative.id, {
@@ -36,28 +31,20 @@ export default function MaCooperative({ cooperative, isRealSession }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isRealSession) {
-      // Le backend ne persiste que nom / telephone / adresse pour l'instant
-      // (voir CooperativeRequest côté serveur) — email/description restent
-      // des champs d'affichage locaux, [À CONFIRMER] si à ajouter au schéma.
-      setSaving(true);
-      try {
-        await updateMyCooperativeReal(cooperative.id, {
-          nom: form.nom, telephone: form.telephone, adresse: form.adresse,
-        });
-        setModal(false);
-      } catch (err) {
-        // le toast d'erreur est déjà géré au niveau de l'appel API (apiClient)
-      } finally {
-        setSaving(false);
-      }
-      return;
+    // Le backend ne persiste que nom / telephone / adresse pour l'instant
+    // (voir CooperativeRequest côté serveur) — email/description restent
+    // des champs d'affichage locaux, [À CONFIRMER] si à ajouter au schéma.
+    setSaving(true);
+    try {
+      await updateMyCooperativeReal(cooperative.id, {
+        nom: form.nom, telephone: form.telephone, adresse: form.adresse,
+      });
+      setModal(false);
+    } catch (err) {
+      // le toast d'erreur est déjà géré au niveau de l'appel API (apiClient)
+    } finally {
+      setSaving(false);
     }
-    updateCooperative(cooperative.id, {
-      nom: form.nom, description: form.description,
-      telephone: form.telephone, email: form.email, adresse: form.adresse,
-    });
-    setModal(false);
   };
 
   return (

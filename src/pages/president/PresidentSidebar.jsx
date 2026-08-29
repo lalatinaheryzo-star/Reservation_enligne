@@ -1,9 +1,8 @@
 // pages/president/PresidentSidebar.jsx
 // ============================================================
 //  Sidebar de l'espace Président — réutilise le style existant
-//  (.sidebar, .nav-item, etc.) sans dépendre de useAuth() (qui est
-//  réservé au système d'authentification réel), afin de ne
-//  toucher à aucun fichier partagé avec l'espace Admin.
+//  (.sidebar, .nav-item, etc.), alimentée par le vrai utilisateur
+//  connecté (prop `user`, issu de la session JWT).
 // ============================================================
 import React from "react";
 import reservationLogo from "../../assets/images/reservation-logo-madagascar.png";
@@ -60,7 +59,7 @@ export default function PresidentSidebar({ active, onChange, user, cooperativeNo
             <div className="avatar">{user?.prenom?.[0]?.toUpperCase() || "P"}</div>
             <div className="sidebar-user-info">
               <p>{user ? `${user.prenom} ${user.nom}` : "Président"}</p>
-              <span>{user?.email || "president@demo.com"}</span>
+              <span>{user?.email || ""}</span>
             </div>
             <LogOut size={15} style={{ color: "rgba(255,255,255,.4)", marginLeft: "auto" }} />
           </div>

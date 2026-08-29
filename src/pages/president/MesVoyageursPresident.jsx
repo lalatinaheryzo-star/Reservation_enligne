@@ -1,17 +1,16 @@
 // pages/president/MesVoyageursPresident.jsx
 import React, { useState } from "react";
 import { Search } from "lucide-react";
-import { getTravelersForCoop } from "../../data/mockPresidentData";
 import { usePresidentContext } from "../../context/PresidentContext";
 
-export default function MesVoyageursPresident({ cooperative, isRealSession }) {
+export default function MesVoyageursPresident({ cooperative }) {
   const { realReservations } = usePresidentContext();
   const [search, setSearch] = useState("");
 
-  // Mode réel : dérivé des réservations de la coopérative (déjà scopées
-  // côté serveur). Le téléphone du voyageur n'est pas encore exposé par
-  // /reservations — [À CONFIRMER] si un endpoint dédié est souhaité.
-  const realTravelers = realReservations.map((r) => ({
+  // Dérivé des réservations de la coopérative (déjà scopées côté serveur).
+  // Le téléphone du voyageur n'est pas encore exposé par /reservations —
+  // [À CONFIRMER] si un endpoint dédié est souhaité.
+  const travelers = realReservations.map((r) => ({
     id: r.id_reservation || r.id,
     nom: r.client || "—",
     telephone: null,
@@ -21,7 +20,6 @@ export default function MesVoyageursPresident({ cooperative, isRealSession }) {
     statut: r.statut,
   }));
 
-  const travelers = isRealSession ? realTravelers : getTravelersForCoop(cooperative?.id);
   const filtered = travelers.filter((t) => (t.nom || "").toLowerCase().includes(search.toLowerCase()));
 
   const statusBadge = (s) => {

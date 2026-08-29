@@ -3,13 +3,11 @@ import React, { useState } from "react";
 import { CheckCircle, XCircle, RefreshCw } from "lucide-react";
 import { usePresidentContext } from "../../context/PresidentContext";
 
-export default function MesReservationsPresident({ cooperative, isRealSession }) {
-  const { travelsByCoop, getReservationsForCoop, realReservations, realPaiements, updateReservationStatutReal, loadMyCooperativeSpace } = usePresidentContext();
+export default function MesReservationsPresident({ cooperative }) {
+  const { realReservations, realPaiements, updateReservationStatutReal, loadMyCooperativeSpace } = usePresidentContext();
   const [savingId, setSavingId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const coopId = cooperative?.id;
-  const travels = travelsByCoop[coopId] || [];
-  const reservations = isRealSession ? realReservations : getReservationsForCoop(coopId);
+  const reservations = realReservations;
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -41,12 +39,10 @@ export default function MesReservationsPresident({ cooperative, isRealSession })
     <div>
       <div className="toolbar">
         <span className="section-title">Mes réservations ({reservations.length})</span>
-        {isRealSession && (
-          <button className="btn btn-secondary btn-sm" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw size={14} style={{ marginRight: 4, animation: refreshing ? "spin 1s linear infinite" : "none" }} />
-            Actualiser
-          </button>
-        )}
+        <button className="btn btn-secondary btn-sm" onClick={handleRefresh} disabled={refreshing}>
+          <RefreshCw size={14} style={{ marginRight: 4, animation: refreshing ? "spin 1s linear infinite" : "none" }} />
+          Actualiser
+        </button>
       </div>
       <div className="card">
         <div className="table-wrap">
@@ -54,13 +50,13 @@ export default function MesReservationsPresident({ cooperative, isRealSession })
             <thead>
               <tr>
                 <th>Voyageur</th><th>Voyage</th><th>Date</th><th>Siège</th><th>Montant</th><th>Paiement</th><th>Statut</th>
-                {isRealSession && <th>Actions</th>}
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {reservations.length === 0 ? (
-                <tr><td colSpan={isRealSession ? 8 : 6} style={{ textAlign: "center", color: "#94a3b8", padding: 24 }}>Aucune réservation</td></tr>
-              ) : isRealSession ? (
+                <tr><td colSpan={8} style={{ textAlign: "center", color: "#94a3b8", padding: 24 }}>Aucune réservation</td></tr>
+              ) : (
                 reservations.map((r) => {
                   const id = r.id_reservation || r.id;
                   const paiement = paiementFor(id);
@@ -87,23 +83,6 @@ export default function MesReservationsPresident({ cooperative, isRealSession })
                           </div>
                         ) : <span style={{ color: "#94a3b8", fontSize: ".78rem" }}>—</span>}
                       </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                reservations.map((r) => {
-                  const trip = travels.find((t) => t.id === r.voyageId);
-                  return (
-                    <tr key={r.id}>
-                      <td style={{ fontWeight: 600 }}>{r.voyageur}</td>
-                      <td style={{ color: "#64748b", fontSize: ".85rem" }}>
-                        {trip ? `${trip.depart} → ${trip.arrivee}` : "—"}
-                      </td>
-                      <td style={{ fontSize: ".82rem" }}>{trip?.date || "—"}</td>
-                      <td>Place {r.siege}</td>
-                      <td>{Number(r.montant).toLocaleString()} Ar</td>
-                      <td>{statusBadge(r.statut === "Payé" ? "Réussi" : "En attente")}</td>
-                      <td>{statusBadge(r.statut)}</td>
                     </tr>
                   );
                 })

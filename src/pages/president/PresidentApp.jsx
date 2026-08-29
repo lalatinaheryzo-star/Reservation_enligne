@@ -1,17 +1,9 @@
 // pages/president/PresidentApp.jsx
 // ============================================================
-//  Espace Président.
-//
-//  Deux modes cohabitent, distingués automatiquement par la présence
-//  d'un token JWT (voir PresidentContext.isRealSession) :
-//   - Compte de démonstration (LoginPresident -> tryDemoLogin) : aucune
-//     requête réseau, toutes les données viennent du mock local
-//     (PresidentContext / mockPresidentData).
-//   - Vrai compte Président (issu de l'approbation d'une
-//     DemandeCooperative) : les données viennent du backend, et
-//     l'isolation entre coopératives est réellement appliquée côté
-//     serveur (voir SecurityConfig + scoping dans les services Java),
-//     pas seulement ici.
+//  Espace Président — entièrement piloté par le backend : les données
+//  viennent de GET /cooperatives/me, et l'isolation entre coopératives
+//  est réellement appliquée côté serveur (voir SecurityConfig + scoping
+//  dans les services Java), pas seulement ici.
 // ============================================================
 import React, { useState, useEffect } from "react";
 import { Bell, Menu } from "lucide-react";
@@ -35,38 +27,33 @@ const PAGE_TITLES = {
 };
 
 export default function PresidentApp({ user, onLogout }) {
-  const { getCooperativeById, isRealSession, realCooperative, realLoading, realError, needsCooperative, loadMyCooperativeSpace } = usePresidentContext();
+  const { realCooperative, realLoading, realError, needsCooperative, loadMyCooperativeSpace } = usePresidentContext();
   const [page, setPage] = useState("dashboard");
   const [mobileNavOpen, setMobileNav] = useState(false);
 
-  useEffect(() => {
-    if (isRealSession) loadMyCooperativeSpace();
-  }, [isRealSession, loadMyCooperativeSpace]);
+  useEffect(() => { loadMyCooperativeSpace(); }, [loadMyCooperativeSpace]);
 
-  // Isolation : le Président ne voit QUE sa propre coopérative.
-  // Mode réel -> résolue côté serveur (GET /cooperatives/me).
-  // Mode démo -> résolue localement à partir de user.cooperative_id.
-  const cooperative = isRealSession ? realCooperative : getCooperativeById(user?.cooperative_id);
+  const cooperative = realCooperative;
 
   const PAGES = {
-    dashboard:    <DashboardPresident cooperative={cooperative} isRealSession={isRealSession} />,
-    cooperative:  <MaCooperative cooperative={cooperative} isRealSession={isRealSession} />,
-    voyages:      <MesVoyagesPresident cooperative={cooperative} isRealSession={isRealSession} president={user} />,
-    reservations: <MesReservationsPresident cooperative={cooperative} isRealSession={isRealSession} />,
-    paiements:    <MesPaiementsPresident cooperative={cooperative} isRealSession={isRealSession} />,
-    voyageurs:    <MesVoyageursPresident cooperative={cooperative} isRealSession={isRealSession} />,
+    dashboard:    <DashboardPresident cooperative={cooperative} />,
+    cooperative:  <MaCooperative cooperative={cooperative} />,
+    voyages:      <MesVoyagesPresident cooperative={cooperative} president={user} />,
+    reservations: <MesReservationsPresident cooperative={cooperative} />,
+    paiements:    <MesPaiementsPresident cooperative={cooperative} />,
+    voyageurs:    <MesVoyageursPresident cooperative={cooperative} />,
   };
 
   const [title, subtitle] = PAGE_TITLES[page] || ["Page", ""];
 
   const renderMain = () => {
-    if (isRealSession && realLoading && !cooperative) {
+    if (realLoading && !cooperative) {
       return <div className="empty-state" style={{ padding: 60, textAlign: "center" }}><p>Chargement de votre coopérative…</p></div>;
     }
-    if (isRealSession && needsCooperative) {
+    if (needsCooperative) {
       return <CreateMyCooperative user={user} />;
     }
-    if (isRealSession && realError && !cooperative) {
+    if (realError && !cooperative) {
       return (
         <div className="empty-state" style={{ padding: 60, textAlign: "center" }}>
           <p style={{ color: "#e11d48", fontWeight: 600 }}>{realError}</p>
@@ -83,7 +70,7 @@ export default function PresidentApp({ user, onLogout }) {
         </div>
       );
     }
-    return PAGES[page] || <DashboardPresident cooperative={cooperative} isRealSession={isRealSession} />;
+    return PAGES[page] || <DashboardPresident cooperative={cooperative} />;
   };
 
   return (

@@ -4,7 +4,6 @@ import {
   LayoutDashboard, Bus, Users, ClipboardList,
   CreditCard, Receipt, Bell, Building2, LogOut, MapPin, X, UserCog, FileClock
 } from "lucide-react";
-import { useAuth } from "../hooks/useAuth";
 import reservationLogo from "../assets/images/reservation-logo-madagascar.png";
 
 const NAV = [
@@ -41,8 +40,7 @@ const NAV = [
   },
 ];
 
-export default function Sidebar({ active, onChange, pendingCount = 0, pendingRequestsCount = 0, mobileOpen = false, onClose = () => {}, onLogout }) {
-  const { user } = useAuth();
+export default function Sidebar({ active, onChange, pendingCount = 0, pendingRequestsCount = 0, mobileOpen = false, onClose = () => {}, onLogout, user }) {
 
   const handleNavClick = (key) => { onChange(key); onClose(); };
 
@@ -93,8 +91,8 @@ export default function Sidebar({ active, onChange, pendingCount = 0, pendingReq
               {user?.email?.[0]?.toUpperCase() || "A"}
             </div>
             <div className="sidebar-user-info">
-              <p>{user?.displayName || "Administrateur"}</p>
-              <span>{user?.email || "admin@voyage.mg"}</span>
+              <p>{[user?.prenom, user?.nom].filter(Boolean).join(" ") || "Administrateur"}</p>
+              <span>{user?.email || ""}</span>
             </div>
             <LogOut size={15} style={{ color: "rgba(255,255,255,.4)", marginLeft: "auto" }} />
           </div>

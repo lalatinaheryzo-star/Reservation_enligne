@@ -9,13 +9,18 @@ import toast from "react-hot-toast";
 // Réservations dont le reçu a déjà été téléchargé : masquées de la liste pour
 // éviter l'accumulation, sans jamais toucher aux données côté serveur. Stocké
 // en local (par navigateur) pour rester masqué même après avoir quitté l'app.
-const HIDDEN_KEY = "reservation_en_ligne_recus_masques_v1";
-function loadHiddenIds() {
+export const HIDDEN_KEY = "reservation_en_ligne_recus_masques_v1";
+export function loadHiddenIds() {
   try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY)) || []); }
   catch { return new Set(); }
 }
 function saveHiddenIds(set) {
-  try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...set])); } catch { /* stockage indisponible, tant pis */ }
+  try {
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify([...set]));
+    // Signale au reste de l'app (ex: le badge du compteur dans UserApp)
+    // qu'un reçu vient d'être masqué, pour qu'il se recalcule immédiatement.
+    window.dispatchEvent(new Event("recus-masques-changed"));
+  } catch { /* stockage indisponible, tant pis */ }
 }
 
 const STATUS_MAP = {

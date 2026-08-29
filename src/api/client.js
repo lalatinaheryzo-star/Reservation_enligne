@@ -6,7 +6,7 @@
 //  Définissez l'URL de l'API dans un fichier .env à la racine
 //  du frontend :  REACT_APP_API_URL=http://localhost:4000/api
 // ============================================================
-const API_URL = process.env.REACT_APP_API_URL || "https://serveur-springboot.onrender.com/api";
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:4000/api";
 const TOKEN_KEY = "voyagemada_token";
 
 export { API_URL };
@@ -21,6 +21,7 @@ export function setToken(token) {
   } catch {
     // sessionStorage indisponible (ex: contexte sandboxé) : on garde juste la valeur en mémoire
   }
+  try { window.dispatchEvent(new Event("auth-token-changed")); } catch { /* no-op */ }
 }
 
 export function getToken() {

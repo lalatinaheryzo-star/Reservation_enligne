@@ -4,18 +4,15 @@ import { Bus, ClipboardList, Wallet, Users, Activity } from "lucide-react";
 import { usePresidentContext } from "../../context/PresidentContext";
 import { useAppContext } from "../../context/AppContext";
 
-export default function DashboardPresident({ cooperative, isRealSession }) {
-  const { travelsByCoop, getReservationsForCoop, getPaymentsForCoop, getActivityForCoop, realReservations, realPaiements } = usePresidentContext();
+export default function DashboardPresident({ cooperative }) {
+  const { realReservations, realPaiements } = usePresidentContext();
   const { voyages: allVoyages } = useAppContext();
   const coopId = cooperative?.id;
 
-  const travels      = isRealSession ? allVoyages.filter((v) => v.cooperative_id === coopId) : (travelsByCoop[coopId] || []);
-  const reservations = isRealSession ? realReservations : getReservationsForCoop(coopId);
-  const payments     = isRealSession ? realPaiements : getPaymentsForCoop(coopId);
-  const activity      = isRealSession ? [] : getActivityForCoop(coopId);
-  const travelers      = isRealSession
-    ? new Set(reservations.map((r) => r.utilisateur_id)).size
-    : new Set(reservations.map((r) => r.voyageur)).size;
+  const travels      = allVoyages.filter((v) => v.cooperative_id === coopId);
+  const reservations = realReservations;
+  const payments     = realPaiements;
+  const travelers     = new Set(reservations.map((r) => r.utilisateur_id)).size;
 
   const totalPaiements = payments
     .filter((p) => p.statut === "Réussi")
@@ -60,36 +57,23 @@ export default function DashboardPresident({ cooperative, isRealSession }) {
       <div className="card" style={{ marginTop: 20 }}>
         <div className="card-header"><h3><Activity size={16} style={{ verticalAlign: "-3px", marginRight: 6 }} />Activité récente</h3></div>
         <div className="card-body">
-          {isRealSession ? (
-            reservations.length === 0 ? (
-              <p className="text-muted">Aucune activité récente.</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {reservations.slice(0, 8).map((r) => {
-                  const id = r.id_reservation || r.id;
-                  return (
-                    <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
-                      <span style={{ fontSize: ".86rem", color: "var(--navy)", fontWeight: 600 }}>
-                        {r.client || "Voyageur"} — {r.ville_depart} → {r.ville_arrivee} ({r.statut})
-                      </span>
-                      <span style={{ fontSize: ".76rem", color: "var(--muted)" }}>
-                        {r.date_reservation ? new Date(r.date_reservation).toLocaleDateString() : ""}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          ) : activity.length === 0 ? (
+          {reservations.length === 0 ? (
             <p className="text-muted">Aucune activité récente.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {activity.map((a) => (
-                <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
-                  <span style={{ fontSize: ".86rem", color: "var(--navy)", fontWeight: 600 }}>{a.texte}</span>
-                  <span style={{ fontSize: ".76rem", color: "var(--muted)" }}>{a.date}</span>
-                </div>
-              ))}
+              {reservations.slice(0, 8).map((r) => {
+                const id = r.id_reservation || r.id;
+                return (
+                  <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
+                    <span style={{ fontSize: ".86rem", color: "var(--navy)", fontWeight: 600 }}>
+                      {r.client || "Voyageur"} — {r.ville_depart} → {r.ville_arrivee} ({r.statut})
+                    </span>
+                    <span style={{ fontSize: ".76rem", color: "var(--muted)" }}>
+                      {r.date_reservation ? new Date(r.date_reservation).toLocaleDateString() : ""}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

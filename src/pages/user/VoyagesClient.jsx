@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import { Bus, Clock, MapPin, ArrowRight, Search, Phone, Mail, X, Building2 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
-//import { findCooperativeContact } from "../../data/mockPresidentData";
 
 export default function VoyagesClient({ onSelectVoyage }) {
   const { voyages, cooperatives, loading } = useAppContext();

@@ -2050,6 +2050,8 @@ textarea { resize: vertical; min-height: 80px; }
   gap: 14px; padding: 56px 28px; text-align: center; color: var(--muted);
 }
 .verif-status-icon.invalid { color: #e11d48; }
+.verif-status-icon.ok { color: #16a34a; }
+.verif-status-icon { color: var(--muted); }
 .verif-card-center h2 { color: var(--navy); font-size: 1.1rem; margin: 0; }
 .verif-muted { font-size: .85rem; color: var(--muted); }
 

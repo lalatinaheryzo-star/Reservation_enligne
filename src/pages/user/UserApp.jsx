@@ -5,9 +5,8 @@ import reservationLogo from "../../assets/images/reservation-logo-madagascar.png
 import VoyagesClient   from "./VoyagesClient";
 import PlaceClient     from "./PlaceClient";
 import PaiementClient  from "./PaiementClient";
-import MesReservations from "./MesReservations";
+import MesReservations, { loadHiddenIds } from "./MesReservations";
 import { useAppContext } from "../../context/AppContext";
-import { getMesReservations } from "../../api/services";
 import toast from "react-hot-toast";
 
 const TABS = [
@@ -17,35 +16,62 @@ const TABS = [
 const FLOW = { VOYAGES:"voyages", PLACE:"place", PAYMENT:"payment", CONFIRM:"confirm" };
 
 export default function UserApp({ user, onLogout }) {
-  const { addReservation } = useAppContext();
+  const { addReservation, reservations, loadMyReservations } = useAppContext();
   const [tab,  setTab]  = useState("voyages");
   const [flow, setFlow] = useState(FLOW.VOYAGES);
   const [selectedVoyage, setSelectedVoyage] = useState(null);
   const [selectedPlace,  setSelectedPlace]  = useState(null);
   const [myResaIds,      setMyResaIds]      = useState([]);
   const [lastPaiement,   setLastPaiement]   = useState(null); // { statut } du dernier paiement effectué
+  const [hiddenReceiptIds, setHiddenReceiptIds] = useState(loadHiddenIds);
 
+  // Reste synchronisé avec MesReservations.jsx dès qu'un reçu est masqué
+  // après téléchargement (voir l'événement "recus-masques-changed").
+  useEffect(() => {
+    const sync = () => setHiddenReceiptIds(loadHiddenIds());
+    window.addEventListener("recus-masques-changed", sync);
+    return () => window.removeEventListener("recus-masques-changed", sync);
+  }, []);
+
+  // Un reçu est "disponible" seulement si la réservation est validée
+  // ET que son reçu n'a pas déjà été téléchargé (masqué).
+  const availableReceiptsCount = reservations.filter((r) => {
+    const id = r.id_reservation || r.id;
+    return myResaIds.includes(id) && r.statut === "Validée" && !hiddenReceiptIds.has(String(id));
+  }).length;
   // Récupère les réservations du voyageur DEPUIS LE SERVEUR (au lieu de se
   // fier uniquement à la mémoire de session) -> survit aux rafraîchissements
   // de page et reflète les validations faites par l'admin entre-temps.
   const refreshMyReservations = useCallback(async () => {
-    try {
-      const mine = await getMesReservations(user.id);
+    const mine = await loadMyReservations();
+    if (mine) {
       setMyResaIds((mine || []).map((r) => r.id_reservation || r.id));
-    } catch {
-      // Si l'appel échoue (ex: hors-ligne), on garde la liste locale existante
-      // plutôt que de vider l'écran.
     }
-  }, [user.id]);
+  }, [loadMyReservations]);
 
+  // Actualisation automatique du statut des réservations au rythme le plus
+  // court possible : c'est ce qui permet au voyageur de voir la validation
+  // faite par le Président quasi instantanément, sans recharger la page.
   useEffect(() => {
     refreshMyReservations();
+
+    const refresh = () => {
+      if (document.visibilityState === "visible") refreshMyReservations();
+    };
+
+    const timer = window.setInterval(refresh, 2000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [refreshMyReservations]);
 
   const goTab = (key) => {
     setTab(key); setFlow(FLOW.VOYAGES);
     setSelectedVoyage(null); setSelectedPlace(null);
-    if (key === "reservations") refreshMyReservations();
+    // Le polling global garde déjà les réservations à jour : pas de double requête
+    // au simple changement d'onglet.
   };
 
   const handleVoyageSelect = (v) => { setSelectedVoyage(v); setFlow(FLOW.PLACE); };
@@ -134,10 +160,10 @@ export default function UserApp({ user, onLogout }) {
           {TABS.map(({ key, label, Icon }) => (
             <button key={key} className={`user-nav-item ${tab===key?"active":""}`} onClick={() => goTab(key)}>
               <Icon size={16} /> <span>{label}</span>
-              {key==="reservations" && myResaIds.length>0 && (
+                {key==="reservations" && availableReceiptsCount>0 && (
                 <span style={{ background:"var(--rose)", color:"white", fontSize:".62rem",
                   fontWeight:800, padding:"2px 6px", borderRadius:20, marginLeft:2 }}>
-                  {myResaIds.length}
+                  {availableReceiptsCount}
                 </span>
               )}
             </button>

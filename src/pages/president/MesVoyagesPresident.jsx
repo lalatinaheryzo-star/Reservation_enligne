@@ -5,39 +5,34 @@ import toast from "react-hot-toast";
 import { usePresidentContext } from "../../context/PresidentContext";
 import { useAppContext } from "../../context/AppContext";
 
-const EMPTY = { depart: "", arrivee: "", date: "", heure: "", vehicule: "Sprinter 18", places: 18, prix: "", statut: "actif", description: "" };
+const EMPTY = { depart: "", arrivee: "", date: "", heure: "", vehicule: "Sprinter 18", places: 18, prix: "", statut: "actif" };
 
-// Ramène un voyage (mock OU réel) vers la même forme locale, pour que le
-// reste du composant n'ait pas à connaître la différence de nommage entre
-// les deux sources (mock: depart/arrivee/date/heure ; backend: ville_depart/
-// ville_arrivee/date_depart/heure_depart/vehicule_nom/capacite).
+// Ramène un voyage (forme backend) vers la forme locale utilisée par ce
+// composant (backend: ville_depart/ville_arrivee/date_depart/heure_depart/
+// vehicule_nom/capacite).
 function normalize(t) {
   return {
     id: t.id_voyage || t.id,
-    depart: t.depart ?? t.ville_depart ?? "",
-    arrivee: t.arrivee ?? t.ville_arrivee ?? "",
-    date: t.date ?? t.date_depart ?? "",
-    heure: (t.heure ?? t.heure_depart ?? "").slice(0, 5),
-    vehicule: t.vehicule ?? t.vehicule_nom ?? "",
-    places: t.places ?? t.capacite ?? 0,
+    depart: t.ville_depart ?? "",
+    arrivee: t.ville_arrivee ?? "",
+    date: t.date_depart ?? "",
+    heure: (t.heure_depart ?? "").slice(0, 5),
+    vehicule: t.vehicule_nom ?? "",
+    places: t.capacite ?? 0,
     // Places encore libres (calculées côté backend à partir des places
-    // réellement réservées/validées, voir VoyageService.toDto) — absent en
-    // mode démo (mock), d'où le fallback null géré plus bas.
+    // réellement réservées/validées, voir VoyageService.toDto).
     placesDisponibles: t.places_disponibles ?? null,
     prix: t.prix ?? 0,
     statut: t.statut ?? "actif",
-    description: t.description ?? "",
   };
 }
 
-export default function MesVoyagesPresident({ cooperative, isRealSession, president }) {
-  const { travelsByCoop, addTravel, updateTravel, removeTravel, realReservations } = usePresidentContext();
+export default function MesVoyagesPresident({ cooperative, president }) {
+  const { realReservations } = usePresidentContext();
   const { voyages: allVoyages, addVoyage, editVoyage, removeVoyage } = useAppContext();
   const coopId = cooperative?.id;
 
-  const rawTravels = isRealSession
-    ? allVoyages.filter((v) => v.cooperative_id === coopId)
-    : (travelsByCoop[coopId] || []);
+  const rawTravels = allVoyages.filter((v) => v.cooperative_id === coopId);
   const travels = rawTravels.map(normalize);
 
   const [search, setSearch]   = useState("");
@@ -53,57 +48,43 @@ export default function MesVoyagesPresident({ cooperative, isRealSession, presid
   // Voyage complet = plus aucune place disponible parmi les places réellement
   // réservées/validées (§6 : on ne compte pas simplement le nombre de
   // réservations créées, on réutilise le calcul déjà fait côté backend).
-  // En mode démo (pas de données de places réelles), on retombe sur le champ
-  // statut existant pour ne rien casser du prototype.
   const isComplet = (t) => (t.placesDisponibles !== null ? t.placesDisponibles <= 0 : t.statut === "complet");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.depart.trim() || !form.arrivee.trim() || !form.date) return;
 
-    if (isRealSession) {
-      const payload = {
-        ville_depart: form.depart.trim(),
-        ville_arrivee: form.arrivee.trim(),
-        date_depart: form.date,
-        heure_depart: form.heure,
-        vehicule_nom: form.vehicule,
-        capacite: Number(form.places) || 18,
-        prix: Number(form.prix) || 0,
-        statut: form.statut,
-      };
-      setSaving(true);
-      try {
-        if (editing) await editVoyage(editing, payload);
-        else await addVoyage(payload);
-        toast.success(editing ? "Voyage modifié." : "Voyage créé.");
-        closeModal();
-      } catch (err) {
-        toast.error(err.message || "Erreur lors de l'enregistrement du voyage.");
-      } finally {
-        setSaving(false);
-      }
-      return;
+    const payload = {
+      ville_depart: form.depart.trim(),
+      ville_arrivee: form.arrivee.trim(),
+      date_depart: form.date,
+      heure_depart: form.heure,
+      vehicule_nom: form.vehicule,
+      capacite: Number(form.places) || 18,
+      prix: Number(form.prix) || 0,
+      statut: form.statut,
+    };
+    setSaving(true);
+    try {
+      if (editing) await editVoyage(editing, payload);
+      else await addVoyage(payload);
+      toast.success(editing ? "Voyage modifié." : "Voyage créé.");
+      closeModal();
+    } catch (err) {
+      toast.error(err.message || "Erreur lors de l'enregistrement du voyage.");
+    } finally {
+      setSaving(false);
     }
-
-    const payload = { ...form, places: Number(form.places) || 18, prix: Number(form.prix) || 0 };
-    if (editing) updateTravel(coopId, editing, payload);
-    else addTravel(coopId, payload);
-    closeModal();
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce voyage ? Cette action est irréversible.")) return;
-    if (isRealSession) {
-      try {
-        await removeVoyage(id);
-        toast.success("Voyage supprimé.");
-      } catch (err) {
-        toast.error(err.message || "Erreur lors de la suppression.");
-      }
-      return;
+    try {
+      await removeVoyage(id);
+      toast.success("Voyage supprimé.");
+    } catch (err) {
+      toast.error(err.message || "Erreur lors de la suppression.");
     }
-    removeTravel(coopId, id);
   };
 
   // Liste imprimable des voyageurs d'un voyage complet — réutilise uniquement
@@ -217,7 +198,7 @@ export default function MesVoyagesPresident({ cooperative, isRealSession, presid
                 </div>
               </div>
 
-              {isRealSession && isComplet(t) && (
+              {isComplet(t) && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #e2e8f0" }}>
                   <div style={{ fontWeight: 700, fontSize: ".78rem", letterSpacing: ".03em", color: "#b45309", marginBottom: 8 }}>
                     VOYAGE COMPLET
@@ -266,10 +247,13 @@ export default function MesVoyagesPresident({ cooperative, isRealSession, presid
                   <div className="form-group">
                     <label>Véhicule</label>
                     <select value={form.vehicule} onChange={(e) => {
-                      const cap = e.target.value.includes("26") ? 26 : 18;
+                      const cap = e.target.value.includes("26") ? 26
+                        : e.target.value.includes("22") ? 22
+                        : 18;
                       setForm({ ...form, vehicule: e.target.value, places: cap });
                     }}>
                       <option value="Sprinter 18">Sprinter 18 places</option>
+                      <option value="Minibus 22">Minibus 22 places</option>
                       <option value="Minibus 26">Minibus 26 places</option>
                     </select>
                   </div>
@@ -289,12 +273,6 @@ export default function MesVoyagesPresident({ cooperative, isRealSession, presid
                       <option value="annulé">Annulé</option>
                     </select>
                   </div>
-                  {!isRealSession && (
-                    <div className="form-group" style={{ gridColumn: "1/-1" }}>
-                      <label>Description</label>
-                      <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Informations complémentaires sur ce voyage…" />
-                    </div>
-                  )}
                 </div>
               </div>
               <div className="modal-footer">

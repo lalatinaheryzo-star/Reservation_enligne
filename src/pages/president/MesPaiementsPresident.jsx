@@ -3,10 +3,10 @@ import React, { useState } from "react";
 import { Wallet, CheckCircle, Clock } from "lucide-react";
 import { usePresidentContext } from "../../context/PresidentContext";
 
-export default function MesPaiementsPresident({ cooperative, isRealSession }) {
-  const { getPaymentsForCoop, realPaiements, realReservations, updatePaiementStatutReal } = usePresidentContext();
+export default function MesPaiementsPresident({ cooperative }) {
+  const { realPaiements, realReservations, updatePaiementStatutReal } = usePresidentContext();
   const [savingId, setSavingId] = useState(null);
-  const payments = isRealSession ? realPaiements : getPaymentsForCoop(cooperative?.id);
+  const payments = realPaiements;
 
   const clientFor = (reservationId) => {
     const r = realReservations.find((x) => (x.id_reservation || x.id) === reservationId);
@@ -58,13 +58,13 @@ export default function MesPaiementsPresident({ cooperative, isRealSession }) {
             <thead>
               <tr>
                 <th>Référence</th><th>Voyageur</th><th>Mode</th><th>Date</th><th>Montant</th><th>Statut</th>
-                {isRealSession && <th>Actions</th>}
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {payments.length === 0 ? (
-                <tr><td colSpan={isRealSession ? 7 : 6} style={{ textAlign: "center", color: "#94a3b8", padding: 24 }}>Aucun paiement</td></tr>
-              ) : isRealSession ? (
+                <tr><td colSpan={7} style={{ textAlign: "center", color: "#94a3b8", padding: 24 }}>Aucun paiement</td></tr>
+              ) : (
                 payments.map((p) => {
                   const id = p.id_paiement || p.id;
                   return (
@@ -85,17 +85,6 @@ export default function MesPaiementsPresident({ cooperative, isRealSession }) {
                     </tr>
                   );
                 })
-              ) : (
-                payments.map((p) => (
-                  <tr key={p.id}>
-                    <td><code style={{ fontSize: ".75rem", color: "#64748b" }}>#{p.id.replace("pay-", "").padStart(3, "0")}</code></td>
-                    <td style={{ fontWeight: 600 }}>{p.voyageur}</td>
-                    <td>{p.mode}</td>
-                    <td>{p.date}</td>
-                    <td>{Number(p.montant).toLocaleString()} Ar</td>
-                    <td>{statusBadge(p.statut)}</td>
-                  </tr>
-                ))
               )}
             </tbody>
           </table>

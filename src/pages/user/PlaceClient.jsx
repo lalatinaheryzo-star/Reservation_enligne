@@ -3,7 +3,10 @@ import React, { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, MapPin } from "lucide-react";
 import toast from "react-hot-toast";
 import { getPlacesForVoyage } from "../../api/services";
-
+import sprinter18 from "../../assets/images/sprinter-18-places.png";
+import sprinter22 from "../../assets/images/sprinter-22-places.png";
+import sprinter26 from "../../assets/images/sprinter-26-places.png";
+import sprinter30 from "../../assets/images/sprinter-30-places.png";
 function SeatButton({ place, selected, onSelect }) {
   const status =
     place.id === selected      ? "selected"
@@ -81,29 +84,61 @@ export default function PlaceClient({ voyage, user, onConfirm, onBack }) {
   const available     = places.filter((p) => p.statut === "disponible" || p.statut === "libre").length;
   const selectedPlace = places.find((p) => (p.id || `seat-${voyageId}-${p.numero_place}`) === selectedId);
 
-  // Positions des 18 sièges sur l'image Sprinter (vue de dessus).
-  // Les boutons restent interactifs : seule leur apparence est remplacée par l'image réaliste.
-  const seatPositions = {
-    1:  { left: "54%", top: "19%" },
-    2:  { left: "71%", top: "19%" },
-    3:  { left: "27%", top: "35%" },
-    4:  { left: "41%", top: "35%" },
-    5:  { left: "60%", top: "35%" },
-    6:  { left: "75%", top: "35%" },
-    7:  { left: "27%", top: "50%" },
-    8:  { left: "41%", top: "50%" },
-    9:  { left: "60%", top: "50%" },
-    10: { left: "75%", top: "50%" },
-    11: { left: "27%", top: "65%" },
-    12: { left: "41%", top: "65%" },
-    13: { left: "60%", top: "65%" },
-    14: { left: "75%", top: "65%" },
-    15: { left: "27%", top: "80%" },
-    16: { left: "41%", top: "80%" },
-    17: { left: "60%", top: "80%" },
-    18: { left: "75%", top: "80%" },
-  };
+  // Même design photo-réaliste pour toutes les capacités.
+  // Seule l'image de fond change selon le nombre de places ;
+  // les boutons interactifs gardent exactement le même rendu que pour 18 places.
+  const realisticVehicle = React.useMemo(() => {
+    const vehicles = {
+      18: { image: sprinter18, height: 1536, extraRows: 0 },
+      22: { image: sprinter22, height: 1766, extraRows: 1 },
+      26: { image: sprinter26, height: 1996, extraRows: 2 },
+      30: { image: sprinter30, height: 2226, extraRows: 3 },
+    };
 
+    // Pour une capacité non prévue par une image dédiée, on conserve
+    // le même rendu de siège (fallback vers le modèle 18 places).
+    return vehicles[capacity] || {
+      image: sprinter18,
+      height: 1536,
+      extraRows: Math.max(0, Math.ceil((capacity - 18) / 4)),
+    };
+  }, [capacity]);
+
+  const seatPositions = React.useMemo(() => {
+    if (!realisticVehicle) return {};
+    const frontY = 292;
+    const originalRearY = [538, 768, 998];
+    const lastOriginalRearY = 1229;
+    const rowStep = 230;
+    const positions = {
+      1: { x: 54, y: frontY },
+      2: { x: 71, y: frontY },
+    };
+    const rearY = [
+      ...originalRearY,
+      ...Array.from({ length: realisticVehicle.extraRows + 1 }, (_, i) =>
+        lastOriginalRearY + rowStep * i
+      ),
+    ];
+    rearY.forEach((y, rowIndex) => {
+      const first = 3 + rowIndex * 4;
+      [[first,27],[first+1,41],[first+2,60],[first+3,75]].forEach(([numero,x]) => {
+        positions[numero] = { x, y };
+      });
+    });
+    return positions;
+  }, [realisticVehicle]);
+
+  const useRealisticImage = Boolean(realisticVehicle);
+
+  const { frontBench, rearRows } = React.useMemo(() => {
+    if (!places.length) return { frontBench: [], rearRows: [] };
+    const fb = places.slice(0, 2);
+    const rear = places.slice(2);
+    const rows = [];
+    for (let i = 0; i < rear.length; i += 4) rows.push(rear.slice(i, i + 4));
+    return { frontBench: fb, rearRows: rows };
+  }, [places]);
 
   return (
     <div>
@@ -147,26 +182,78 @@ export default function PlaceClient({ voyage, user, onConfirm, onBack }) {
         <div className="card-body">
           {loading ? (
             <div style={{ padding:40, textAlign:"center", color:"#64748b" }}>Chargement des places…</div>
-          ) : (
+          ) : useRealisticImage ? (
             <div className="vehicle-stage sprinter-image-stage">
-              <div className="sprinter-image-map" aria-label="Plan réaliste du Sprinter 18 places">
+              <div
+                className="sprinter-image-map"
+                style={{
+                  backgroundImage: `url(${realisticVehicle.image})`,
+                  aspectRatio: `1024 / ${realisticVehicle.height}`,
+                }}
+                aria-label={`Plan réaliste du Sprinter ${capacity} places`}
+              >
                 <div className="sprinter-image-overlay" aria-hidden="true" />
                 <div className="sprinter-driver-hotspot" aria-hidden="true">
                   <span>Chauffeur</span>
                 </div>
-                {places.map((place) => (
-                  <div
-                    key={place.id || place.numero_place}
-                    className="sprinter-seat-hotspot"
-                    style={seatPositions[Number(place.numero_place)] || { left: "50%", top: "50%" }}
-                  >
-                    <SeatButton
-                      place={place}
-                      selected={selectedId}
-                      onSelect={selectSeat}
-                    />
+                {places.map((place) => {
+                  const position = seatPositions[Number(place.numero_place)];
+                  if (!position) return null;
+                  return (
+                    <div
+                      key={place.id || place.numero_place}
+                      className="sprinter-seat-hotspot"
+                      style={{ left: `${position.x}%`, top: `${(position.y / realisticVehicle.height) * 100}%` }}
+                    >
+                      <SeatButton place={place} selected={selectedId} onSelect={selectSeat} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="vehicle-stage">
+              <div className="sprinter-shell">
+                <div className="vehicle-mirror left"  aria-hidden="true" />
+                <div className="vehicle-mirror right" aria-hidden="true" />
+                <div className="vehicle-wheel front"  aria-hidden="true" />
+                <div className="vehicle-wheel rear"   aria-hidden="true" />
+                <div className="vehicle-door"         aria-hidden="true" />
+                <span className="vehicle-door-label">Porte coulissante</span>
+                <div className="sprinter-windshield"  aria-hidden="true" />
+
+                <div className="sprinter-cabin-row">
+                  <div className="driver-seat">
+                    <span className="driver-icon" aria-hidden="true">DR</span>
+                    <strong>Chauffeur</strong>
                   </div>
-                ))}
+                  <div className="sprinter-front-aisle" aria-hidden="true">Allée</div>
+                  <div className="front-bench">
+                    {frontBench.map((place) => (
+                      <SeatButton key={place.id || place.numero_place} place={place} selected={selectedId} onSelect={selectSeat} />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="sprinter-cabin-divider"><span>Accès passagers</span></div>
+
+                <div className="sprinter-rear-rows">
+                  {rearRows.map((row, ri) => (
+                    <div className="sprinter-passenger-row" key={`rear-row-${ri}`}>
+                      <div className="sprinter-side-pair">
+                        {row.slice(0, 2).map((place) => (
+                          <SeatButton key={place.id || place.numero_place} place={place} selected={selectedId} onSelect={selectSeat} />
+                        ))}
+                      </div>
+                      <div className="sprinter-center-aisle" aria-hidden="true" />
+                      <div className="sprinter-side-pair">
+                        {row.slice(2, 4).map((place) => (
+                          <SeatButton key={place.id || place.numero_place} place={place} selected={selectedId} onSelect={selectSeat} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

@@ -1,5 +1,5 @@
 // App.jsx — routage principal entre Landing, Admin, Président et Utilisateur
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { Toaster } from "react-hot-toast";
 import { AppProvider, useAppContext } from "./context/AppContext";
 import { PresidentProvider } from "./context/PresidentContext";
@@ -11,22 +11,35 @@ import LoginAdmin  from "./pages/LoginAdmin";
 import LoginUser   from "./pages/LoginUser";
 import LoginPresident from "./pages/LoginPresident";
 import IntegrerCooperative from "./pages/IntegrerCooperative";
-import UserApp     from "./pages/user/UserApp";
-import PresidentApp from "./pages/president/PresidentApp";
+
+// Chargées à la demande : chaque espace (Admin/Président/Voyageur) ne
+// télécharge son code (et ses dépendances comme recharts, qrcode,
+// react-to-print) qu'une fois réellement ouvert, au lieu d'alourdir le
+// chargement initial commun (site vitrine + écrans de connexion) pour
+// tout le monde, y compris un simple voyageur.
+const UserApp      = lazy(() => import("./pages/user/UserApp"));
+const PresidentApp = lazy(() => import("./pages/president/PresidentApp"));
+const VerificationQR = lazy(() => import("./pages/VerificationQR"));
+const VerifyEmail    = lazy(() => import("./pages/VerifyEmail"));
 
 import Sidebar       from "./components/Sidebar";
-import Dashboard     from "./pages/Dashboard";
-import Voyages       from "./pages/Voyages";
-import Cooperatives  from "./pages/Cooperatives";
-import Reservations  from "./pages/Reservations";
-import Utilisateurs  from "./pages/Utilisateurs";
-import Paiements     from "./pages/Paiements";
-import Recus         from "./pages/Recus";
-import Notifications from "./pages/Notifications";
-import Places        from "./pages/Places";
-import VerificationQR from "./pages/VerificationQR";
-import AdminPresidents from "./pages/AdminPresidents";
-import AdminDemandesCooperatives from "./pages/AdminDemandesCooperatives";
+const Dashboard     = lazy(() => import("./pages/Dashboard"));
+const Voyages       = lazy(() => import("./pages/Voyages"));
+const Cooperatives  = lazy(() => import("./pages/Cooperatives"));
+const Reservations  = lazy(() => import("./pages/Reservations"));
+const Utilisateurs  = lazy(() => import("./pages/Utilisateurs"));
+const Paiements     = lazy(() => import("./pages/Paiements"));
+const Recus         = lazy(() => import("./pages/Recus"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+const Places        = lazy(() => import("./pages/Places"));
+const AdminPresidents = lazy(() => import("./pages/AdminPresidents"));
+const AdminDemandesCooperatives = lazy(() => import("./pages/AdminDemandesCooperatives"));
+
+// Fallback minimal, sans impact visuel notable, pendant le chargement
+// à la demande du code d'une page (quelques centaines de ms max).
+function PageLoading() {
+  return <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Chargement…</div>;
+}
 
 import { Bell, RefreshCw, Menu } from "lucide-react";
 
@@ -44,6 +57,14 @@ const PAGE_TITLES = {
   places:        ["Places",           "Disponibilité par voyage"],
 };
 
+// Intervalle de rafraîchissement automatique le plus court possible sans
+// saturer le pool de connexions DB (Hikari : 5 connexions max côté Supabase,
+// voir application.properties). En-dessous de ~2s, des utilisateurs
+// simultanés en polling peuvent épuiser le pool et ralentir tout le monde —
+// 2000 ms est le plancher raisonnable pour rester quasi instantané sans
+// dégrader les temps de réponse.
+const POLL_INTERVAL_MS = 2000;
+
 function AdminApp({ user, onLogout }) {
   const [page, setPage]               = useState("dashboard");
   const [mobileNavOpen, setMobileNav] = useState(false);
@@ -51,11 +72,44 @@ function AdminApp({ user, onLogout }) {
   const [pendingRequests, setPendingRequests] = useState(0);
   const pending = reservations.filter((r) => r.statut === "En attente").length;
 
+  // Le badge des demandes se met à jour automatiquement, au rythme le plus
+  // court possible (POLL_INTERVAL_MS), y compris en tâche de fond.
   useEffect(() => {
-    getDemandesCooperatives()
-      .then((list) => setPendingRequests((list || []).filter((r) => r.statut === "PENDING").length))
-      .catch(() => {}); // badge non-critique : on ignore silencieusement une erreur réseau
-  }, [page]); // se rafraîchit à chaque changement de page (ex: après un retour de "demandes")
+    let cancelled = false;
+
+    const refreshPending = async () => {
+      try {
+        const list = await getDemandesCooperatives();
+        if (!cancelled) {
+          setPendingRequests((list || []).filter((r) => r.statut === "PENDING").length);
+        }
+      } catch {
+        // Badge non critique : aucune erreur ne doit ralentir l'affichage.
+      }
+    };
+
+    refreshPending();
+    const timer = window.setInterval(refreshPending, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  // Actualisation automatique des données ADMIN au rythme le plus court
+  // possible, pour que les mises à jour soient visibles quasi immédiatement.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") loadAdmin();
+    };
+
+    const timer = window.setInterval(refresh, POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [loadAdmin]);
 
   const PAGES = {
     dashboard:     <Dashboard />,
@@ -83,6 +137,7 @@ function AdminApp({ user, onLogout }) {
         mobileOpen={mobileNavOpen}
         onClose={() => setMobileNav(false)}
         onLogout={onLogout}
+        user={user}
       />
       <div className="main-content">
         <header className="topbar">
@@ -111,7 +166,9 @@ function AdminApp({ user, onLogout }) {
           </div>
         </header>
         <main className="page-content">
-          {PAGES[page] || <Dashboard />}
+          <Suspense fallback={<PageLoading />}>
+            {PAGES[page] || <Dashboard />}
+          </Suspense>
         </main>
       </div>
     </div>
@@ -130,10 +187,11 @@ function AppInner() {
   // conservé tel quel et toujours utilisé pour la connexion Admin/Voyageur/Président.
   const [entry, setEntry] = useState("vitrine");
 
-  const handleAdminLogin = async (user) => {
+  const handleAdminLogin = (user) => {
     setAdminUser(user);
-    // Charger les données protégées maintenant qu'on a le token
-    await loadAdmin();
+    // Le chargement complet ne bloque plus l'entrée dans l'espace ADMIN.
+    // Les données arrivent en arrière-plan et le polling les maintient à jour.
+    loadAdmin();
   };
 
   const handleLogoutAdmin     = () => { setAdminUser(null); setSpace(null); setEntry("vitrine"); };
@@ -181,14 +239,18 @@ function AppInner() {
           onIntegrateCooperative={() => { setSpace(null); setEntry("integrer-cooperative"); }} />
       )}
       {space === "president" && presidentUser && (
-        <PresidentApp user={presidentUser} onLogout={handleLogoutPresident} />
+        <Suspense fallback={<PageLoading />}>
+          <PresidentApp user={presidentUser} onLogout={handleLogoutPresident} />
+        </Suspense>
       )}
 
       {space === "user" && !clientUser && (
         <LoginUser onLogin={setClientUser} onBack={() => setSpace(null)} />
       )}
       {space === "user" && clientUser && (
-        <UserApp user={clientUser} onLogout={handleLogoutUser} />
+        <Suspense fallback={<PageLoading />}>
+          <UserApp user={clientUser} onLogout={handleLogoutUser} />
+        </Suspense>
       )}
     </>
   );
@@ -202,7 +264,24 @@ export default function App() {
     return (
       <>
         <Toaster position="top-right" toastOptions={{ style: { borderRadius: 10, fontSize: ".84rem" } }} />
-        <VerificationQR token={verifyMatch[1]} />
+        <Suspense fallback={<PageLoading />}>
+          <VerificationQR token={verifyMatch[1]} />
+        </Suspense>
+      </>
+    );
+  }
+
+  // Route publique : /verifier-email?token=... — lien envoyé après
+  // inscription (voir backend EmailVerificationService). Ne nécessite ni
+  // connexion ni AppContext.
+  if (window.location.pathname.replace(/\/$/, "") === "/verifier-email") {
+    const params = new URLSearchParams(window.location.search);
+    return (
+      <>
+        <Toaster position="top-right" toastOptions={{ style: { borderRadius: 10, fontSize: ".84rem" } }} />
+        <Suspense fallback={<PageLoading />}>
+          <VerifyEmail token={params.get("token")} onGoToLogin={() => { window.location.href = "/"; }} />
+        </Suspense>
       </>
     );
   }

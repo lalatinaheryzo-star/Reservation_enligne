@@ -14,9 +14,19 @@ export async function loginUser(email, password) {
 }
 
 export async function registerUser({ nom, prenom, email, password, telephone }) {
+  // Pas de connexion automatique : le backend n'émet un token qu'une fois
+  // l'adresse e-mail vérifiée (voir verifyEmail ci-dessous). data.token
+  // vaut null juste après l'inscription.
   const data = await apiClient.post("/auth/register", { nom, prenom, email, password, telephone });
-  setToken(data.token);
   return data.user;
+}
+
+export function verifyEmail(token) {
+  return apiClient.post("/auth/verify-email", { token });
+}
+
+export function resendVerification(email) {
+  return apiClient.post("/auth/resend-verification", { email });
 }
 
 export async function fetchCurrentUser() {
