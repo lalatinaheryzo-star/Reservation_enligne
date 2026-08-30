@@ -20,7 +20,6 @@ export function AppProvider({ children }) {
   const [loading,        setLoading]        = useState(true);
 
   // ── Phase 1 : données publiques (sans token) ─────────────
-  // ── Phase 1 : données publiques (sans token) ─────────────
   // hasLoadedOnceRef évite que le rafraîchissement automatique (toutes les
   // 2s, voir plus bas) ne repasse "loading" à true à chaque fois : c'est ce
   // qui faisait clignoter la liste des voyages (elle disparaissait puis

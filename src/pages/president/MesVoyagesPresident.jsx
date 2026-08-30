@@ -1,5 +1,5 @@
 // pages/president/MesVoyagesPresident.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus, Search, Pencil, Trash2, Calendar, Clock, X, Printer } from "lucide-react";
 import toast from "react-hot-toast";
 import { usePresidentContext } from "../../context/PresidentContext";
@@ -48,8 +48,24 @@ export default function MesVoyagesPresident({ cooperative, president }) {
   // Voyage complet = plus aucune place disponible parmi les places réellement
   // réservées/validées (§6 : on ne compte pas simplement le nombre de
   // réservations créées, on réutilise le calcul déjà fait côté backend).
-  const isComplet = (t) => (t.placesDisponibles !== null ? t.placesDisponibles <= 0 : t.statut === "complet");
+   // Horloge locale qui se met à jour toutes les 30 secondes, pour que
+  // "Voyage complet" bascule automatiquement à l'affichage dès que l'heure
+  // de départ est atteinte, sans avoir à recharger la page.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
+   // Horloge locale qui se met à jour toutes les 30 secondes, pour que
+  // "Voyage complet" bascule automatiquement à l'affichage dès que l'heure
+  // de départ est atteinte, sans avoir à recharger la page.
+  const isComplet = (t) => {
+    if (!t.date || !t.heure) return false;
+    const depart = new Date(`${t.date}T${t.heure}:00`);
+    if (Number.isNaN(depart.getTime())) return false;
+    return now >= depart;
+  };
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.depart.trim() || !form.arrivee.trim() || !form.date) return;
@@ -139,6 +155,21 @@ export default function MesVoyagesPresident({ cooperative, president }) {
     if (!win) { toast.error("Veuillez autoriser les fenêtres popup pour imprimer."); return; }
     win.document.write(html);
     win.document.close();
+
+    // Suppression automatique du trajet une fois l'impression terminée (la
+    // fenêtre se ferme quand la boîte de dialogue d'impression du
+    // navigateur se referme, que ce soit après impression ou annulation —
+    // le navigateur ne permet pas de distinguer les deux cas).
+    win.addEventListener("afterprint", async () => {
+      win.close();
+      try {
+        await removeVoyage(t.id);
+        toast.success("Voyage supprimé après impression.");
+      } catch (err) {
+        toast.error(err.message || "Erreur lors de la suppression après impression.");
+      }
+    });
+
     win.focus();
     win.print();
   };

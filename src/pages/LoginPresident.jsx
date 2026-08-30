@@ -12,12 +12,14 @@ import { Building2, Mail, Lock, ArrowLeft, Eye, EyeOff, Bus } from "lucide-react
 import toast from "react-hot-toast";
 import { loginUser } from "../api/services";
 import { setToken } from "../api/client";
+import ForgotPasswordModal from "../components/ForgotPasswordModal";
 
 export default function LoginPresident({ onLogin, onBack, onIntegrateCooperative }) {
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [showPwd,  setShowPwd]  = useState(false);
   const [loading,  setLoading]  = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -80,6 +82,10 @@ export default function LoginPresident({ onLogin, onBack, onIntegrateCooperative
                   {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
+              <button type="button" onClick={() => setShowForgot(true)}
+                style={{ background: "none", border: "none", padding: 0, marginTop: 6, color: "var(--accent)", fontSize: ".78rem", fontWeight: 600, cursor: "pointer" }}>
+                Mot de passe oublié ?
+              </button>
             </div>
             <button type="submit" className="btn btn-primary login-btn" disabled={loading}>
               {loading ? "Connexion…" : "Se connecter"}
@@ -95,6 +101,7 @@ export default function LoginPresident({ onLogin, onBack, onIntegrateCooperative
           </p>
         </div>
       </div>
+      {showForgot && <ForgotPasswordModal onClose={() => setShowForgot(false)} />}
     </div>
   );
 }

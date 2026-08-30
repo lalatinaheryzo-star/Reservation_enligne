@@ -29,6 +29,10 @@ export function resendVerification(email) {
   return apiClient.post("/auth/resend-verification", { email });
 }
 
+export function forgotPassword(email) {
+  return apiClient.post("/auth/forgot-password", { email });
+}
+
 export async function fetchCurrentUser() {
   if (!getToken()) return null;
   return apiClient.get("/auth/me");

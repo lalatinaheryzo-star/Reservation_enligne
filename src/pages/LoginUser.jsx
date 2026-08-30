@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { loginUser, registerUser, verifyEmail, resendVerification } from "../api/services";
+import ForgotPasswordModal from "../components/ForgotPasswordModal";
 
 // ── CONNEXION ────────────────────────────────────────────────
 function LoginForm({ onLogin, onBack, onSwitchToRegister, onNeedsVerification }) {
@@ -14,6 +15,7 @@ function LoginForm({ onLogin, onBack, onSwitchToRegister, onNeedsVerification })
   const [password, setPassword] = useState("");
   const [showPwd,  setShowPwd]  = useState(false);
   const [loading,  setLoading]  = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -69,6 +71,10 @@ function LoginForm({ onLogin, onBack, onSwitchToRegister, onNeedsVerification })
                   {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
+              <button type="button" onClick={() => setShowForgot(true)}
+                style={{ background: "none", border: "none", padding: 0, marginTop: 6, color: "var(--accent)", fontSize: ".78rem", fontWeight: 600, cursor: "pointer" }}>
+                Mot de passe oublié ?
+              </button>
             </div>
             <button type="submit" className="btn btn-primary login-btn" disabled={loading}>
               {loading ? "Connexion…" : "Se connecter"} <LogIn size={15} />
@@ -82,6 +88,7 @@ function LoginForm({ onLogin, onBack, onSwitchToRegister, onNeedsVerification })
           </div>
         </div>
       </div>
+      {showForgot && <ForgotPasswordModal onClose={() => setShowForgot(false)} />}
     </div>
   );
 }
