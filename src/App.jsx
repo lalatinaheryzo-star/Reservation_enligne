@@ -1,17 +1,20 @@
+
+
+App · JSX
 // App.jsx — routage principal entre Landing, Admin, Président et Utilisateur
 import React, { useState, useEffect, Suspense, lazy } from "react";
 import { Toaster } from "react-hot-toast";
 import { AppProvider, useAppContext } from "./context/AppContext";
 import { PresidentProvider } from "./context/PresidentContext";
 import { getDemandesCooperatives } from "./api/services";
-
+ 
 import SiteVitrine from "./pages/SiteVitrine";
 import Landing     from "./pages/Landing";
 import LoginAdmin  from "./pages/LoginAdmin";
 import LoginUser   from "./pages/LoginUser";
 import LoginPresident from "./pages/LoginPresident";
 import IntegrerCooperative from "./pages/IntegrerCooperative";
-
+ 
 // Chargées à la demande : chaque espace (Admin/Président/Voyageur) ne
 // télécharge son code (et ses dépendances comme recharts, qrcode,
 // react-to-print) qu'une fois réellement ouvert, au lieu d'alourdir le
@@ -20,8 +23,7 @@ import IntegrerCooperative from "./pages/IntegrerCooperative";
 const UserApp      = lazy(() => import("./pages/user/UserApp"));
 const PresidentApp = lazy(() => import("./pages/president/PresidentApp"));
 const VerificationQR = lazy(() => import("./pages/VerificationQR"));
-const VerifyEmail    = lazy(() => import("./pages/VerifyEmail"));
-
+ 
 import Sidebar       from "./components/Sidebar";
 const Dashboard     = lazy(() => import("./pages/Dashboard"));
 const Voyages       = lazy(() => import("./pages/Voyages"));
@@ -34,15 +36,15 @@ const Notifications = lazy(() => import("./pages/Notifications"));
 const Places        = lazy(() => import("./pages/Places"));
 const AdminPresidents = lazy(() => import("./pages/AdminPresidents"));
 const AdminDemandesCooperatives = lazy(() => import("./pages/AdminDemandesCooperatives"));
-
+ 
 // Fallback minimal, sans impact visuel notable, pendant le chargement
 // à la demande du code d'une page (quelques centaines de ms max).
 function PageLoading() {
   return <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Chargement…</div>;
 }
-
+ 
 import { Bell, RefreshCw, Menu } from "lucide-react";
-
+ 
 const PAGE_TITLES = {
   dashboard:     ["Tableau de bord",  "Vue d'ensemble du système"],
   voyages:       ["Voyages",          "Gérer les trajets disponibles"],
@@ -56,7 +58,7 @@ const PAGE_TITLES = {
   notifications: ["Notifications",    "Communications envoyées"],
   places:        ["Places",           "Disponibilité par voyage"],
 };
-
+ 
 // Intervalle de rafraîchissement automatique le plus court possible sans
 // saturer le pool de connexions DB (Hikari : 5 connexions max côté Supabase,
 // voir application.properties). En-dessous de ~2s, des utilisateurs
@@ -64,19 +66,19 @@ const PAGE_TITLES = {
 // 2000 ms est le plancher raisonnable pour rester quasi instantané sans
 // dégrader les temps de réponse.
 const POLL_INTERVAL_MS = 2000;
-
+ 
 function AdminApp({ user, onLogout }) {
   const [page, setPage]               = useState("dashboard");
   const [mobileNavOpen, setMobileNav] = useState(false);
   const { reservations, loadAll, loadAdmin } = useAppContext();
   const [pendingRequests, setPendingRequests] = useState(0);
   const pending = reservations.filter((r) => r.statut === "En attente").length;
-
+ 
   // Le badge des demandes se met à jour automatiquement, au rythme le plus
   // court possible (POLL_INTERVAL_MS), y compris en tâche de fond.
   useEffect(() => {
     let cancelled = false;
-
+ 
     const refreshPending = async () => {
       try {
         const list = await getDemandesCooperatives();
@@ -87,7 +89,7 @@ function AdminApp({ user, onLogout }) {
         // Badge non critique : aucune erreur ne doit ralentir l'affichage.
       }
     };
-
+ 
     refreshPending();
     const timer = window.setInterval(refreshPending, POLL_INTERVAL_MS);
     return () => {
@@ -95,14 +97,14 @@ function AdminApp({ user, onLogout }) {
       window.clearInterval(timer);
     };
   }, []);
-
+ 
   // Actualisation automatique des données ADMIN au rythme le plus court
   // possible, pour que les mises à jour soient visibles quasi immédiatement.
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState === "visible") loadAdmin();
     };
-
+ 
     const timer = window.setInterval(refresh, POLL_INTERVAL_MS);
     document.addEventListener("visibilitychange", refresh);
     return () => {
@@ -110,7 +112,7 @@ function AdminApp({ user, onLogout }) {
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [loadAdmin]);
-
+ 
   const PAGES = {
     dashboard:     <Dashboard />,
     voyages:       <Voyages />,
@@ -124,9 +126,9 @@ function AdminApp({ user, onLogout }) {
     notifications: <Notifications />,
     places:        <Places />,
   };
-
+ 
   const [title, subtitle] = PAGE_TITLES[page] || ["Page", ""];
-
+ 
   return (
     <div className="app-layout">
       <Sidebar
@@ -174,7 +176,7 @@ function AdminApp({ user, onLogout }) {
     </div>
   );
 }
-
+ 
 // ── Composant racine avec accès au contexte ───────────────
 function AppInner() {
   const { loadAdmin } = useAppContext();
@@ -186,22 +188,22 @@ function AppInner() {
   // "chooser" = ancien écran de sélection d'espace (Landing.jsx),
   // conservé tel quel et toujours utilisé pour la connexion Admin/Voyageur/Président.
   const [entry, setEntry] = useState("vitrine");
-
+ 
   const handleAdminLogin = (user) => {
     setAdminUser(user);
     // Le chargement complet ne bloque plus l'entrée dans l'espace ADMIN.
     // Les données arrivent en arrière-plan et le polling les maintient à jour.
     loadAdmin();
   };
-
+ 
   const handleLogoutAdmin     = () => { setAdminUser(null); setSpace(null); setEntry("vitrine"); };
   const handleLogoutUser      = () => { setClientUser(null); setSpace(null); setEntry("vitrine"); };
   const handleLogoutPresident = () => { setPresidentUser(null); setSpace(null); setEntry("vitrine"); };
-
+ 
   return (
     <>
       <Toaster position="top-right" toastOptions={{ style:{ borderRadius:10, fontSize:".84rem" } }} />
-
+ 
       {/* Site vitrine Réservation en ligne : point d'entrée public, avant tout choix d'espace.
           "Réserver maintenant" mène directement à l'espace voyageur ;
           "Se connecter" ouvre l'écran de choix existant ;
@@ -214,7 +216,7 @@ function AppInner() {
           onIntegrateCooperativeClick={() => setEntry("integrer-cooperative")}
         />
       )}
-
+ 
       {!space && entry === "integrer-cooperative" && (
         <IntegrerCooperative
           onBack={() => setEntry("vitrine")}
@@ -222,18 +224,18 @@ function AppInner() {
           onSubmitted={() => { setEntry("vitrine"); }}
         />
       )}
-
+ 
       {!space && entry === "chooser" && (
         <Landing onChoose={setSpace} onBack={() => setEntry("vitrine")} />
       )}
-
+ 
       {space === "admin" && !adminUser && (
         <LoginAdmin onLogin={handleAdminLogin} onBack={() => setSpace(null)} />
       )}
       {space === "admin" && adminUser && (
         <AdminApp user={adminUser} onLogout={handleLogoutAdmin} />
       )}
-
+ 
       {space === "president" && !presidentUser && (
         <LoginPresident onLogin={setPresidentUser} onBack={() => setSpace(null)}
           onIntegrateCooperative={() => { setSpace(null); setEntry("integrer-cooperative"); }} />
@@ -243,7 +245,7 @@ function AppInner() {
           <PresidentApp user={presidentUser} onLogout={handleLogoutPresident} />
         </Suspense>
       )}
-
+ 
       {space === "user" && !clientUser && (
         <LoginUser onLogin={setClientUser} onBack={() => setSpace(null)} />
       )}
@@ -255,7 +257,7 @@ function AppInner() {
     </>
   );
 }
-
+ 
 export default function App() {
   // Route publique : /verify/<token> — page de contrôle scannée par
   // l'agent de la gare. Ne nécessite ni connexion ni AppContext.
@@ -270,22 +272,7 @@ export default function App() {
       </>
     );
   }
-
-  // Route publique : /verifier-email?token=... — lien envoyé après
-  // inscription (voir backend EmailVerificationService). Ne nécessite ni
-  // connexion ni AppContext.
-  if (window.location.pathname.replace(/\/$/, "") === "/verifier-email") {
-    const params = new URLSearchParams(window.location.search);
-    return (
-      <>
-        <Toaster position="top-right" toastOptions={{ style: { borderRadius: 10, fontSize: ".84rem" } }} />
-        <Suspense fallback={<PageLoading />}>
-          <VerifyEmail token={params.get("token")} onGoToLogin={() => { window.location.href = "/"; }} />
-        </Suspense>
-      </>
-    );
-  }
-
+ 
   return (
     <AppProvider>
       <PresidentProvider>
@@ -294,3 +281,4 @@ export default function App() {
     </AppProvider>
   );
 }
+ 

@@ -1,3 +1,6 @@
+
+
+Integrercooperative · JSX
 // pages/IntegrerCooperative.jsx
 // ============================================================
 //  Point d'entrée PUBLIC pour une personne responsable d'une
@@ -9,44 +12,36 @@
 //  l'accueil (section Président), pas depuis l'espace Voyageur connecté.
 //
 //  Si la personne n'a pas encore de compte, ce formulaire crée le compte
-//  (registerUser), attend la vérification de son e-mail (code envoyé par
-//  le backend), puis dépose la demande (createDemandeCooperative) une fois
-//  connectée. Si elle a déjà un compte, elle peut basculer sur "J'ai déjà
+//  (registerUser — compte actif immédiatement, aucune vérification par
+//  e-mail) puis dépose la demande (createDemandeCooperative) dans la
+//  foulée. Si elle a déjà un compte, elle peut basculer sur "J'ai déjà
 //  un compte" pour se connecter directement.
 // ============================================================
 import React, { useState } from "react";
 import reservationLogo from "../assets/images/reservation-logo-madagascar.png";
-import { Building2, Phone, Mail, MapPin, CreditCard, User, Lock, Send, ArrowLeft, Bus, KeyRound } from "lucide-react";
+import { Building2, Phone, Mail, MapPin, CreditCard, User, Lock, Send, ArrowLeft, Bus } from "lucide-react";
 import toast from "react-hot-toast";
-import { registerUser, loginUser, createDemandeCooperative, verifyEmail, resendVerification } from "../api/services";
-
+import { registerUser, loginUser, createDemandeCooperative } from "../api/services";
+ 
 const EMPTY_ACCOUNT = { nom: "", prenom: "", email: "", telephone: "", password: "" };
 const EMPTY_COOP    = { nom_president: "", telephone: "", email: "", cin: "", nom_cooperative: "", ville: "", adresse: "", message: "" };
-
+ 
 export default function IntegrerCooperative({ onBack, onSubmitted, onGoToLogin }) {
   const [hasAccount, setHasAccount] = useState(false);
   const [account, setAccount] = useState(EMPTY_ACCOUNT);
   const [coop,    setCoop]    = useState(EMPTY_COOP);
   const [submitting, setSubmitting] = useState(false);
-  // Un compte fraîchement créé n'est pas encore connecté : le backend exige
-  // que l'adresse e-mail soit vérifiée avant d'émettre un token (voir
-  // AuthService.register()). On garde donc la demande de côté le temps que
-  // la personne confirme son adresse, puis on termine l'envoi.
-  const [awaitingVerification, setAwaitingVerification] = useState(false);
-  const [verifCode, setVerifCode] = useState("");
-  const [verifying, setVerifying] = useState(false);
-  const [resending, setResending] = useState(false);
-
+ 
   const set = (obj, setter) => (field) => (e) => setter({ ...obj, [field]: e.target.value });
   const setAcc  = set(account, setAccount);
   const setCoopF = set(coop, setCoop);
-
+ 
   const finishSubmission = async () => {
     await createDemandeCooperative(coop);
     toast.success("Demande envoyée ! Vous pourrez vous connecter à votre espace Président une fois la demande approuvée par l'administrateur.", { duration: 6000 });
     onSubmitted?.();
   };
-
+ 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!coop.nom_president.trim() || !coop.telephone.trim() || !coop.email.trim() || !coop.nom_cooperative.trim()) {
@@ -57,13 +52,15 @@ export default function IntegrerCooperative({ onBack, onSubmitted, onGoToLogin }
       toast.error("Veuillez remplir vos informations de compte (mot de passe : 6 caractères minimum).");
       return;
     }
-
+ 
     setSubmitting(true);
     try {
       if (hasAccount) {
         await loginUser(account.email.trim(), account.password);
         await finishSubmission();
       } else {
+        // Compte créé et actif immédiatement : le backend renvoie un token
+        // JWT, on peut enchaîner directement sur le dépôt de la demande.
         await registerUser({
           nom: account.nom.trim(),
           prenom: account.prenom.trim(),
@@ -71,91 +68,16 @@ export default function IntegrerCooperative({ onBack, onSubmitted, onGoToLogin }
           telephone: account.telephone.trim() || coop.telephone.trim(),
           password: account.password,
         });
-        toast.success("Compte créé ! Vérifiez votre boîte mail pour finaliser votre demande.");
-        setAwaitingVerification(true);
+        toast.success("Compte créé avec succès.");
+        await finishSubmission();
       }
     } catch (err) {
-      if (err.status === 401 && /vérifier votre adresse/i.test(err.message || "") && hasAccount) {
-        setAwaitingVerification(true); // compte existant mais jamais vérifié : bascule sur l'écran de vérification
-      } else {
-        toast.error(err.message || "Erreur lors de l'envoi de la demande.");
-      }
+      toast.error(err.message || "Erreur lors de l'envoi de la demande.");
     } finally {
       setSubmitting(false);
     }
   };
-
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    if (!verifCode.trim()) { toast.error("Collez le code reçu par e-mail."); return; }
-    setVerifying(true);
-    try {
-      await verifyEmail(verifCode.trim());
-      await loginUser(account.email.trim(), account.password);
-      await finishSubmission();
-    } catch (err) {
-      toast.error(err.message || "Code invalide ou expiré.");
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  const handleResend = async () => {
-    setResending(true);
-    try {
-      await resendVerification(account.email.trim());
-      toast.success("Un nouveau code de vérification a été envoyé.");
-    } catch (err) {
-      toast.error(err.message || "Impossible de renvoyer le code.");
-    } finally {
-      setResending(false);
-    }
-  };
-
-  if (awaitingVerification) {
-    return (
-      <div className="auth-page">
-        <div className="auth-bg-decor">
-          <div className="auth-bg-blob b1" /><div className="auth-bg-blob b2" /><div className="auth-bg-blob b3" />
-        </div>
-        <div className="auth-card">
-          <div className="auth-card-header" style={{ background: "linear-gradient(135deg,#059669,#10B981)" }}>
-            <div className="auth-header-brand">
-              <img src={reservationLogo} alt="Réservation en ligne" className="brand-logo-image brand-logo-image--auth" />
-              <span>Réservation en ligne</span>
-            </div>
-            <div className="auth-card-header-icon"><Mail size={26} /></div>
-            <h2>Vérifiez votre e-mail</h2>
-            <p>Un code de vérification a été envoyé à {account.email}</p>
-          </div>
-          <div className="auth-card-body">
-            <button className="auth-back-btn" onClick={onBack}><ArrowLeft size={14} /> Retour à l'accueil</button>
-            <form onSubmit={handleVerify}>
-              <div className="form-group">
-                <label>Code de vérification <span className="req">*</span></label>
-                <div className="input-icon-wrap">
-                  <KeyRound size={14} className="icon" />
-                  <input type="text" inputMode="numeric" maxLength={6} placeholder="123456"
-                    value={verifCode} onChange={(e) => setVerifCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    style={{ letterSpacing: "4px", fontSize: "1.1rem", textAlign: "center" }} />
-                </div>
-              </div>
-              <button type="submit" className="btn btn-primary login-btn" disabled={verifying}>
-                {verifying ? "Vérification…" : "Vérifier et envoyer ma demande"} <Send size={15} />
-              </button>
-            </form>
-            <div className="auth-switch-section">
-              <p>Vous n'avez rien reçu ? Vérifiez vos spams, ou :</p>
-              <button className="btn btn-secondary login-btn" onClick={handleResend} disabled={resending}>
-                {resending ? "Envoi…" : "Renvoyer le code"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+ 
   return (
     <div className="auth-page">
       <div className="auth-bg-decor">
@@ -175,7 +97,7 @@ export default function IntegrerCooperative({ onBack, onSubmitted, onGoToLogin }
           <button className="auth-back-btn" onClick={onBack}>
             <ArrowLeft size={14} /> Retour à l'accueil
           </button>
-
+ 
           <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
             <button type="button"
               className={`btn ${!hasAccount ? "btn-primary" : "btn-secondary"} btn-sm`}
@@ -188,7 +110,7 @@ export default function IntegrerCooperative({ onBack, onSubmitted, onGoToLogin }
               J'ai déjà un compte
             </button>
           </div>
-
+ 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: ".8rem", color: "var(--navy)", marginBottom: 8, textTransform: "uppercase", letterSpacing: ".03em" }}>
@@ -248,9 +170,9 @@ export default function IntegrerCooperative({ onBack, onSubmitted, onGoToLogin }
                 </>
               )}
             </div>
-
+ 
             <div className="divider" />
-
+ 
             <div>
               <div style={{ fontWeight: 700, fontSize: ".8rem", color: "var(--navy)", marginBottom: 8, textTransform: "uppercase", letterSpacing: ".03em" }}>
                 Votre coopérative
@@ -316,12 +238,12 @@ export default function IntegrerCooperative({ onBack, onSubmitted, onGoToLogin }
                 </div>
               </div>
             </div>
-
+ 
             <button type="submit" className="btn btn-primary" disabled={submitting} style={{ justifyContent: "center", marginTop: 6 }}>
               <Send size={14} /> {submitting ? "Envoi…" : "Envoyer ma demande d'intégration"}
             </button>
           </form>
-
+ 
           <p style={{ marginTop: 18, fontSize: ".74rem", color: "var(--muted)", textAlign: "center" }}>
             Déjà Président d'une coopérative approuvée ?{" "}
             <button type="button" onClick={onGoToLogin}
@@ -334,3 +256,4 @@ export default function IntegrerCooperative({ onBack, onSubmitted, onGoToLogin }
     </div>
   );
 }
+ 

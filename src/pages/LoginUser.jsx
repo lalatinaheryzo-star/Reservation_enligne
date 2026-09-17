@@ -1,3 +1,6 @@
+
+
+Loginuser · JSX
 // pages/LoginUser.jsx — connecté au backend Express
 import React, { useState } from "react";
 import reservationLogo from "../assets/images/reservation-logo-madagascar.png";
@@ -6,17 +9,17 @@ import {
   Eye, EyeOff, Home, CreditCard, Bus, LogIn, UserPlus,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { loginUser, registerUser, verifyEmail, resendVerification } from "../api/services";
+import { loginUser, registerUser, logoutUser } from "../api/services";
 import ForgotPasswordModal from "../components/ForgotPasswordModal";
-
+ 
 // ── CONNEXION ────────────────────────────────────────────────
-function LoginForm({ onLogin, onBack, onSwitchToRegister, onNeedsVerification }) {
+function LoginForm({ onLogin, onBack, onSwitchToRegister }) {
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [showPwd,  setShowPwd]  = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [showForgot, setShowForgot] = useState(false);
-
+ 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email.trim()) { toast.error("Entrez votre e-mail."); return; }
@@ -27,14 +30,10 @@ function LoginForm({ onLogin, onBack, onSwitchToRegister, onNeedsVerification })
       onLogin(user);
       toast.success(`Bienvenue, ${user.prenom} !`);
     } catch (err) {
-      if (err.status === 401 && /vérifier votre adresse/i.test(err.message || "")) {
-        onNeedsVerification(email.trim());
-        return;
-      }
       toast.error(err.message || "Identifiants incorrects.");
     } finally { setLoading(false); }
   };
-
+ 
   return (
     <div className="auth-page">
       <div className="auth-bg-decor">
@@ -92,85 +91,7 @@ function LoginForm({ onLogin, onBack, onSwitchToRegister, onNeedsVerification })
     </div>
   );
 }
-
-// ── EN ATTENTE DE VÉRIFICATION D'E-MAIL ───────────────────────
-function PendingVerification({ email: initialEmail, onSwitchToLogin, onBack }) {
-  const [email,   setEmail]   = useState(initialEmail || "");
-  const [code,    setCode]    = useState("");
-  const [checking, setChecking] = useState(false);
-  const [resending, setResending] = useState(false);
-
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    if (!code.trim()) { toast.error("Collez le code reçu par e-mail."); return; }
-    setChecking(true);
-    try {
-      await verifyEmail(code.trim());
-      toast.success("E-mail vérifié ! Vous pouvez vous connecter.");
-      onSwitchToLogin();
-    } catch (err) {
-      toast.error(err.message || "Code invalide ou expiré.");
-    } finally { setChecking(false); }
-  };
-
-  const handleResend = async () => {
-    if (!email.trim()) { toast.error("Entrez votre e-mail."); return; }
-    setResending(true);
-    try {
-      await resendVerification(email.trim());
-      toast.success("Un nouveau code de vérification a été envoyé.");
-    } catch (err) {
-      toast.error(err.message || "Impossible de renvoyer le code.");
-    } finally { setResending(false); }
-  };
-
-  return (
-    <div className="auth-page">
-      <div className="auth-bg-decor">
-        <div className="auth-bg-blob b1" /><div className="auth-bg-blob b2" /><div className="auth-bg-blob b3" />
-      </div>
-      <div className="auth-card">
-        <div className="auth-card-header user">
-          <div className="auth-header-brand">
-            <img src={reservationLogo} alt="Réservation en ligne" className="brand-logo-image brand-logo-image--auth" /><span>Réservation en ligne</span>
-          </div>
-          <div className="auth-card-header-icon"><Mail size={26} /></div>
-          <h2>Vérifiez votre e-mail</h2>
-          <p>Un code de vérification a été envoyé à {initialEmail || "votre adresse"}</p>
-        </div>
-        <div className="auth-card-body">
-          <button className="auth-back-btn" onClick={onBack}><ArrowLeft size={14} /> Retour à l'accueil</button>
-          <form onSubmit={handleVerify}>
-            <div className="form-group">
-              <label>Code de vérification <span className="req">*</span></label>
-              <div className="input-icon-wrap">
-                <Lock size={14} className="icon" />
-                <input type="text" inputMode="numeric" maxLength={6} placeholder="123456"
-                  value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  style={{ letterSpacing: "4px", fontSize: "1.1rem", textAlign: "center" }} />
-              </div>
-            </div>
-            <button type="submit" className="btn btn-primary login-btn" disabled={checking}>
-              {checking ? "Vérification…" : "Vérifier mon e-mail"} <ArrowRight size={15} />
-            </button>
-          </form>
-          <div className="auth-switch-section">
-            <p>Vous n'avez rien reçu ? Vérifiez vos spams, ou :</p>
-            {!initialEmail && (
-              <div className="form-group" style={{ marginBottom: 10 }}>
-                <input type="email" placeholder="votre@email.mg" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </div>
-            )}
-            <button className="btn btn-secondary login-btn" onClick={handleResend} disabled={resending}>
-              {resending ? "Envoi…" : "Renvoyer le code"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+ 
 // ── INSCRIPTION ──────────────────────────────────────────────
 function RegisterForm({ onBack, onSwitchToLogin }) {
   const [nom,       setNom]       = useState("");
@@ -180,11 +101,7 @@ function RegisterForm({ onBack, onSwitchToLogin }) {
   const [password,  setPassword]  = useState("");
   const [showPwd,   setShowPwd]   = useState(false);
   const [loading,   setLoading]   = useState(false);
-  // Une fois le compte créé, on affiche l'écran "vérifiez votre e-mail"
-  // plutôt que de connecter automatiquement : le backend n'émet un token
-  // qu'après confirmation de l'adresse (voir AuthService.register()).
-  const [registeredEmail, setRegisteredEmail] = useState(null);
-
+ 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!nom.trim())    { toast.error("Le nom est obligatoire."); return; }
@@ -194,18 +111,18 @@ function RegisterForm({ onBack, onSwitchToLogin }) {
     if (password.length < 6) { toast.error("Mot de passe : 6 caractères minimum."); return; }
     setLoading(true);
     try {
+      // Le compte est actif immédiatement (aucune vérification e-mail).
+      // On repart sur l'écran de connexion : la personne se connecte avec
+      // les identifiants qu'elle vient de choisir.
       await registerUser({ nom, prenom, email: email.trim(), password, telephone });
-      setRegisteredEmail(email.trim());
-      toast.success("Compte créé ! Vérifiez votre boîte mail.");
+      await logoutUser();
+      toast.success("Compte créé avec succès.");
+      onSwitchToLogin();
     } catch (err) {
       toast.error(err.message || "Erreur lors de l'inscription.");
     } finally { setLoading(false); }
   };
-
-  if (registeredEmail) {
-    return <PendingVerification email={registeredEmail} onSwitchToLogin={onSwitchToLogin} onBack={onBack} />;
-  }
-
+ 
   return (
     <div className="auth-page">
       <div className="auth-bg-decor">
@@ -282,21 +199,18 @@ function RegisterForm({ onBack, onSwitchToLogin }) {
     </div>
   );
 }
-
+ 
 export default function LoginUser({ onLogin, onBack }) {
-  const [screen, setScreen] = useState("login"); // login | register | verify
-  const [pendingEmail, setPendingEmail] = useState(null);
-
+  const [screen, setScreen] = useState("login"); // login | register
+ 
   if (screen === "register")
     return <RegisterForm onBack={onBack} onSwitchToLogin={() => setScreen("login")} />;
-  if (screen === "verify")
-    return <PendingVerification email={pendingEmail} onSwitchToLogin={() => setScreen("login")} onBack={onBack} />;
   return (
     <LoginForm
       onLogin={onLogin}
       onBack={onBack}
       onSwitchToRegister={() => setScreen("register")}
-      onNeedsVerification={(email) => { setPendingEmail(email); setScreen("verify"); }}
     />
   );
 }
+ 

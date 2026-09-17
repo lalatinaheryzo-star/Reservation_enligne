@@ -14,23 +14,23 @@ export async function loginUser(email, password) {
 }
 
 export async function registerUser({ nom, prenom, email, password, telephone }) {
-  // Pas de connexion automatique : le backend n'émet un token qu'une fois
-  // l'adresse e-mail vérifiée (voir verifyEmail ci-dessous). data.token
-  // vaut null juste après l'inscription.
+  // Plus aucune vérification par e-mail : le compte est créé et actif
+  // immédiatement, et le backend renvoie directement un token JWT.
   const data = await apiClient.post("/auth/register", { nom, prenom, email, password, telephone });
+  if (data.token) setToken(data.token);
   return data.user;
 }
 
-export function verifyEmail(token) {
-  return apiClient.post("/auth/verify-email", { token });
+// ── MOT DE PASSE OUBLIÉ ───────────────────────────────────
+// Bouton "Nouveau code" : génère un code à 6 chiffres et invalide
+// le précédent. Réponse : { code, expiration }.
+export function genererNouveauCode(email) {
+  return apiClient.post("/auth/password/nouveau-code", { email });
 }
 
-export function resendVerification(email) {
-  return apiClient.post("/auth/resend-verification", { email });
-}
-
-export function forgotPassword(email) {
-  return apiClient.post("/auth/forgot-password", { email });
+// Validation du dernier code généré + nouveau mot de passe.
+export function reinitialiserMotDePasse({ email, code, password }) {
+  return apiClient.post("/auth/password/reinitialiser", { email, code, password });
 }
 
 export async function fetchCurrentUser() {
