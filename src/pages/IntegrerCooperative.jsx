@@ -1,6 +1,6 @@
 
 
-Integrercooperative · JSX
+//Integrercooperative · JSX
 // pages/IntegrerCooperative.jsx
 // ============================================================
 //  Point d'entrée PUBLIC pour une personne responsable d'une

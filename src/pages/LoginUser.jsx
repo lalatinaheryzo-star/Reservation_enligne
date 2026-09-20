@@ -1,6 +1,4 @@
 
-
-Loginuser · JSX
 // pages/LoginUser.jsx — connecté au backend Express
 import React, { useState } from "react";
 import reservationLogo from "../assets/images/reservation-logo-madagascar.png";

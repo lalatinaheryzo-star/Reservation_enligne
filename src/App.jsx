@@ -1,6 +1,4 @@
 
-
-App · JSX
 // App.jsx — routage principal entre Landing, Admin, Président et Utilisateur
 import React, { useState, useEffect, Suspense, lazy } from "react";
 import { Toaster } from "react-hot-toast";
