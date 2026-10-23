@@ -22,10 +22,10 @@ export async function registerUser({ nom, prenom, email, password, telephone }) 
 }
 
 // ── MOT DE PASSE OUBLIÉ ───────────────────────────────────
-// Bouton "Nouveau code" : génère un code à 6 chiffres et invalide
-// le précédent. Réponse : { code, expiration }.
-export function genererNouveauCode(email) {
-  return apiClient.post("/auth/password/nouveau-code", { email });
+// Bouton « Nouveau code » : demande un envoi par e-mail. La réponse HTTP ne contient pas le code.
+// Le code est envoyé par e-mail ; le endpoint renvoie 204 sans corps.
+export async function genererNouveauCode(email) {
+  await apiClient.post("/auth/password/nouveau-code", { email });
 }
 
 // Validation du dernier code généré + nouveau mot de passe.
