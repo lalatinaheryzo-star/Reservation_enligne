@@ -45,6 +45,8 @@ export default function MesReservations({ myReservationIds = [] }) {
   const [openRecuFor, setOpenRecuFor] = useState(null); // id de réservation dont le reçu est affiché
   const [downloadingId, setDownloadingId] = useState(null);
   const [hiddenIds, setHiddenIds] = useState(loadHiddenIds);
+  const [receiptStates, setReceiptStates] = useState({});
+  const [receiptCheckKey, setReceiptCheckKey] = useState(0);
 
   useEffect(() => {
     loadMyReservations();
@@ -63,11 +65,36 @@ export default function MesReservations({ myReservationIds = [] }) {
   const sessionResas = reservations.filter((r) =>
     myReservationIds.includes(r.id_reservation || r.id) && !hiddenIds.has(String(r.id_reservation || r.id))
   );
+  const reservationIdsKey = JSON.stringify(sessionResas.map((r) => r.id_reservation || r.id));
 
-  const handleQuickDownload = async (resaId) => {
+  useEffect(() => {
+    let cancelled = false;
+    const reservationIds = JSON.parse(reservationIdsKey);
+    if (reservationIds.length === 0) {
+      setReceiptStates({});
+      return () => { cancelled = true; };
+    }
+
+    setReceiptStates(Object.fromEntries(reservationIds.map((id) => [id, { status: "loading" }])));
+    Promise.all(reservationIds.map(async (id) => {
+      try {
+        const recu = await getRecuByReservation(id);
+        return [id, { status: "available", recu }];
+      } catch (err) {
+        if (err.status === 404) return [id, { status: "missing" }];
+        if (err.status === 403) return [id, { status: "forbidden" }];
+        return [id, { status: "error", message: err.message || "Erreur réseau ou serveur." }];
+      }
+    })).then((results) => {
+      if (!cancelled) setReceiptStates(Object.fromEntries(results));
+    });
+
+    return () => { cancelled = true; };
+  }, [reservationIdsKey, receiptCheckKey]);
+
+  const handleQuickDownload = async (resaId, recu) => {
     setDownloadingId(resaId);
     try {
-      const recu = await getRecuByReservation(resaId);
       await downloadRecuPdf(recu.id, `${recu.numero_recu}.pdf`);
       hideAfterDownload(resaId);
     } catch (err) {
@@ -147,22 +174,48 @@ export default function MesReservations({ myReservationIds = [] }) {
                   </div>
                 </div>
               </div>
-              {r.statut === "Validée" && (
+              {receiptStates[resaId]?.status === "available" && (
                 <div style={{ background:"#f0fdf4", borderTop:"1px solid #86efac", padding:"10px 20px" }}>
                   <div style={{ fontSize:".78rem", color:"#16a34a", fontWeight:600, marginBottom:10 }}>
-                    Réservation confirmée. Présentez votre reçu au guichet ou le jour du départ.
+                    Reçu disponible selon la confirmation du serveur.
                   </div>
                   <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                     <button className="btn btn-secondary btn-sm" onClick={() => setOpenRecuFor(resaId)}>
                       <FileText size={13} /> Voir le reçu
                     </button>
-                    <button className="btn btn-secondary btn-sm" onClick={() => handleQuickDownload(resaId)} disabled={downloadingId === resaId}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => handleQuickDownload(resaId, receiptStates[resaId].recu)} disabled={downloadingId === resaId}>
                       <Download size={13} /> {downloadingId === resaId ? "Téléchargement…" : "Télécharger le PDF"}
                     </button>
                     <button className="btn btn-secondary btn-sm" onClick={() => setOpenRecuFor(resaId)}>
                       <Printer size={13} /> Imprimer
                     </button>
                   </div>
+                </div>
+              )}
+              {receiptStates[resaId]?.status === "loading" && (
+                <div style={{ background:"#f8fafc", borderTop:"1px solid #e2e8f0", padding:"10px 20px", fontSize:".78rem", color:"#64748b" }}>
+                  Vérification de la disponibilité du reçu…
+                </div>
+              )}
+              {receiptStates[resaId]?.status === "missing" && (
+                <div style={{ background:"#fffbeb", borderTop:"1px solid #fde68a", padding:"10px 20px", fontSize:".78rem", color:"#92400e" }}>
+                  Aucun reçu disponible pour le moment. Il apparaîtra après confirmation du paiement.
+                  <button className="btn btn-secondary btn-sm" onClick={() => setReceiptCheckKey((key) => key + 1)} style={{ marginLeft:10 }}>
+                    Vérifier à nouveau
+                  </button>
+                </div>
+              )}
+              {receiptStates[resaId]?.status === "forbidden" && (
+                <div role="alert" style={{ background:"#fff1f2", borderTop:"1px solid #fda4af", padding:"10px 20px", fontSize:".78rem", color:"#e11d48" }}>
+                  Accès refusé lors de la vérification du reçu.
+                </div>
+              )}
+              {receiptStates[resaId]?.status === "error" && (
+                <div role="alert" style={{ background:"#fff1f2", borderTop:"1px solid #fda4af", padding:"10px 20px", fontSize:".78rem", color:"#e11d48" }}>
+                  Impossible de vérifier la disponibilité du reçu : {receiptStates[resaId].message}
+                  <button className="btn btn-secondary btn-sm" onClick={() => setReceiptCheckKey((key) => key + 1)} style={{ marginLeft:10 }}>
+                    Réessayer
+                  </button>
                 </div>
               )}
               {r.statut === "Refusée" && (

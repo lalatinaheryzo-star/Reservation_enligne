@@ -107,10 +107,15 @@ export function PresidentProvider({ children }) {
   }, []);
 
   const updatePaiementStatutReal = useCallback(async (id, statut) => {
-    const updated = await updatePaiementStatut(id, statut);
-    setRealPaiements((prev) => prev.map((p) => ((p.id_paiement || p.id) === id ? updated : p)));
-    toast.success("Paiement validé.");
-    return updated;
+    try {
+      const updated = await updatePaiementStatut(id, statut);
+      setRealPaiements((prev) => prev.map((p) => ((p.id_paiement || p.id) === id ? updated : p)));
+      toast.success(`Paiement mis à jour : ${updated.statut}.`);
+      return updated;
+    } catch (err) {
+      toast.error(err.message || "Impossible de confirmer le paiement.");
+      throw err;
+    }
   }, []);
 
   const value = {

@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { ArrowLeft, CheckCircle2, CreditCard, Smartphone } from "lucide-react";
 import toast from "react-hot-toast";
 import { apiClient } from "../../api/client";
-import { createPaiement, createRecu } from "../../api/services";
+import { createPaiement } from "../../api/services";
 
 const MODES = [
   { id: "Mvola",        label: "Mvola",        Icon: Smartphone },
@@ -16,72 +16,102 @@ const MODES = [
 
 export default function PaiementClient({ voyage, place, user, onSuccess, onBack }) {
   const [mode,    setMode]    = useState(null);
-  const [ref,     setRef]     = useState("");
   const [loading, setLoading] = useState(false);
+
+  const paymentErrorMessage = (err) => {
+    const detail = err.message || "Erreur inattendue.";
+    if (err.status === 400) return `Paiement refusé : données invalides. ${detail}`;
+    if (err.status === 403) return `Paiement refusé : accès non autorisé. ${detail}`;
+    if (err.status === 409) return `Paiement en conflit ou indisponible. ${detail}`;
+    if (err.status) return `Le paiement a échoué (HTTP ${err.status}). ${detail}`;
+    return `Impossible de confirmer le résultat du paiement. ${detail}`;
+  };
 
   const handlePay = async () => {
     if (!mode) {
       toast.error("Choisissez un mode de paiement.");
       return;
     }
-    if (mode !== "Espèces" && !ref.trim()) {
-      toast.error("Entrez la référence de transaction.");
+    if (mode !== "Espèces") {
+      toast.error("Seul le paiement en espèces est actuellement disponible.");
       return;
     }
 
     setLoading(true);
+    const placeId = place.id || place.id_place;
+    let resa;
     try {
       // ── UN SEUL appel : réserve la place ET crée la réservation ──
       // placeController.reserve() fait tout en une transaction atomique.
       // NE PAS appeler createReservation() en plus — c'est lui qui causait le 409.
-      const placeId = place.id || place.id_place;
-      const resa = await apiClient.post(`/places/${placeId}/reserver`, {
+      resa = await apiClient.post(`/places/${placeId}/reserver`, {
         utilisateur_id: user.id,
       });
+    } catch (err) {
+      const detail = err.message || "Erreur inattendue.";
+      if (err.status === 409) {
+        toast.error(`Réservation impossible (HTTP 409) : ${detail}`);
+      } else if (err.status === 400) {
+        toast.error(`Données de réservation invalides (HTTP 400) : ${detail}`);
+      } else if (err.status === 403) {
+        toast.error(`Réservation refusée (HTTP 403) : ${detail}`);
+      } else {
+        toast.error(err.status ? `Erreur de réservation (HTTP ${err.status}) : ${detail}` : detail);
+      }
+      setLoading(false);
+      return;
+    }
 
-      // ── Créer le paiement ────────────────────────────────────
-      const paiementStatut = mode === "Espèces" ? "En attente" : "Réussi";
+    const notifyReservationCreated = (paiementStatut) => onSuccess({
+      ...resa,
+      id: resa.id || resa.id_reservation,
+      mode,
+      voyage,
+      place,
+      numero_place: place.numero_place,
+      ville_depart: voyage.ville_depart,
+      ville_arrivee: voyage.ville_arrivee,
+      date_depart: voyage.date_depart,
+      heure_depart: voyage.heure_depart,
+      prix: voyage.prix,
+      paiement_statut: paiementStatut,
+    });
+
+    try {
       const paiement = await createPaiement({
         reservation_id: resa.id || resa.id_reservation,
-        montant:        Number(voyage.prix),
-        mode_paiement:  mode,
-        statut:         paiementStatut,
+        montant: Number(voyage.prix),
+        mode_paiement: mode,
+        statut: "En attente",
       });
 
-      // ── Générer un reçu si paiement réussi ──────────────────
-// ── Générer un reçu si paiement réussi ──────────────────
-      if (paiementStatut === "Réussi") {
-        try {
-          await createRecu(paiement.id_paiement || paiement.id);
-        } catch (err) {
-          console.error("[PaiementClient] Échec création du reçu :", err);
-          toast.error("Paiement enregistré, mais la génération du reçu a échoué : " + (err.message || "erreur inconnue"));
-        }
-      }
-
-      // ── Succès ───────────────────────────────────────────────
-      onSuccess({
-        ...resa,
-        id:            resa.id || resa.id_reservation,
-        mode,
-        reference:     ref,
-        voyage,
-        place,
-        numero_place:  place.numero_place,
-        ville_depart:  voyage.ville_depart,
-        ville_arrivee: voyage.ville_arrivee,
-        date_depart:   voyage.date_depart,
-        heure_depart:  voyage.heure_depart,
-        prix:          voyage.prix,
-        paiement_statut: paiementStatut,
-      });
-
+      notifyReservationCreated(paiement.statut || "Statut indisponible");
     } catch (err) {
-      const msg = err.message || "";
-      if (err.status === 409 || msg.toLowerCase().includes("occupée") || msg.toLowerCase().includes("occupee")) {
-        toast.error("Cette place vient d'être prise. Veuillez en choisir une autre.");
+      if (err.status === 409) {
+        toast.error(
+          `La réservation a été créée, mais la demande de paiement est en conflit (HTTP 409). ` +
+          `${paymentErrorMessage(err)} Vérifiez le statut du paiement avant de réessayer. ` +
+          `La place n'a pas été libérée automatiquement.`
+        );
+        notifyReservationCreated("Paiement à vérifier");
+      } else if (err.status === 400 || err.status === 403) {
+        toast.error(
+          `La réservation a été créée et reste en attente, mais le paiement a été refusé (HTTP ${err.status}). ` +
+          `${paymentErrorMessage(err)} La place n'a pas été libérée automatiquement.`
+        );
+        notifyReservationCreated("Paiement non enregistré");
+      } else if (err.status && err.status < 500) {
+        toast.error(
+          `La réservation a été créée, mais le paiement n'a pas été confirmé (HTTP ${err.status}). ` +
+          `${paymentErrorMessage(err)} La place n'a pas été libérée automatiquement.`
+        );
+        notifyReservationCreated("Paiement non confirmé");
       } else {
-        toast.error(msg || "Erreur lors de la réservation.");
+        toast.error(
+          `La réservation a été créée, mais le résultat du paiement est incertain${err.status ? ` (HTTP ${err.status})` : ""}. ` +
+          `Vérifiez vos réservations avant de réessayer. La place n'a pas été libérée automatiquement.`
+        );
+        notifyReservationCreated("Résultat incertain");
       }
     } finally {
       setLoading(false);
@@ -125,24 +155,17 @@ export default function PaiementClient({ voyage, place, user, onSuccess, onBack 
                 key={id}
                 className={`payment-method-btn ${mode === id ? "active" : ""}`}
                 onClick={() => setMode(id)}
+                disabled={id !== "Espèces"}
+                aria-label={id === "Espèces" ? label : `${label}, indisponible`}
+                title={id === "Espèces" ? undefined : "Moyen de paiement indisponible"}
+                style={id === "Espèces" ? undefined : { opacity: 0.5, cursor: "not-allowed" }}
               >
                 <Icon size={18} style={{ display: "block", margin: "0 auto 6px" }} />
                 {label}
+                {id !== "Espèces" && <span style={{ display: "block", fontSize: ".65rem" }}>Indisponible</span>}
               </button>
             ))}
           </div>
-
-          {mode && mode !== "Espèces" && (
-            <div className="form-group" style={{ marginTop: 14 }}>
-              <label>Référence de transaction *</label>
-              <input
-                type="text"
-                placeholder={`Numéro reçu par SMS via ${mode}`}
-                value={ref}
-                onChange={(e) => setRef(e.target.value)}
-              />
-            </div>
-          )}
 
           {mode === "Espèces" && (
             <div style={{
@@ -156,9 +179,9 @@ export default function PaiementClient({ voyage, place, user, onSuccess, onBack 
 
           {mode && (
             <div className="payment-confirm-box">
-              <CheckCircle2 size={20} color="#16a34a" style={{ flexShrink: 0 }} />
+              <CheckCircle2 size={20} color="#d97706" style={{ flexShrink: 0 }} />
               <p>
-                Paiement de {Number(voyage.prix).toLocaleString()} Ar via {mode} · Place {place.numero_place}
+                Paiement en espèces de {Number(voyage.prix).toLocaleString()} Ar en attente de confirmation au guichet · Place {place.numero_place}
               </p>
             </div>
           )}

@@ -1,10 +1,8 @@
 // src/api/services.js
 // ============================================================
-//  Couche de services qui appelle le serveur Express (../server)
-//  au lieu de Firebase. Mêmes noms de fonctions que
-//  src/firebase/services.js pour pouvoir basculer facilement.
+//  Couche de services qui appelle le serveur Express et Spring Boot
 // ============================================================
-import { apiClient, setToken, getToken, downloadProtectedFile } from "./client";
+import { apiClient, authClient, setToken, getToken, downloadProtectedFile } from "./client";
 
 // ── AUTH ──────────────────────────────────────────────────
 export async function loginUser(email, password) {
@@ -21,16 +19,16 @@ export async function registerUser({ nom, prenom, email, password, telephone }) 
   return data.user;
 }
 
-// ── MOT DE PASSE OUBLIÉ ───────────────────────────────────
-// Bouton « Nouveau code » : demande un envoi par e-mail. La réponse HTTP ne contient pas le code.
+// ── MOT DE PASSE OUBLIÉ (serveur Express Node.js) ─────────
+// Bouton « Nouveau code » : demande un envoi par e-mail via le serveur Node.js.
 // Le code est envoyé par e-mail ; le endpoint renvoie 204 sans corps.
 export async function genererNouveauCode(email) {
-  await apiClient.post("/auth/password/nouveau-code", { email });
+  await authClient.post("/auth/password/nouveau-code", { email });
 }
 
-// Validation du dernier code généré + nouveau mot de passe.
+// Validation du dernier code généré + nouveau mot de passe via le serveur Node.js.
 export function reinitialiserMotDePasse({ email, code, password }) {
-  return apiClient.post("/auth/password/reinitialiser", { email, code, password });
+  return authClient.post("/auth/password/reinitialiser", { email, code, password });
 }
 
 export async function fetchCurrentUser() {
@@ -83,7 +81,7 @@ export const createUtilisateur = (payload) => apiClient.post("/utilisateurs", pa
 export const updateUtilisateur = (id, payload) => apiClient.put(`/utilisateurs/${id}`, payload);
 export const deleteUtilisateur = (id) => apiClient.delete(`/utilisateurs/${id}`);
 
-// ── RESERVATIONS ──────────────────────────────────────────// ── RESERVATIONS ──────────────────────────────────────────
+// ── RESERVATIONS ──────────────────────────────────────────
 export const getReservations = (statut) =>
   apiClient.get(statut ? `/reservations?statut=${encodeURIComponent(statut)}` : "/reservations");
 export const getMesReservations = (utilisateurId) =>
@@ -101,7 +99,6 @@ export const deletePaiement = (id) => apiClient.delete(`/paiements/${id}`);
 
 // ── RECUS ─────────────────────────────────────────────────
 export const getRecus = () => apiClient.get("/recus");
-export const createRecu = (paiementId) => apiClient.post("/recus", { paiement_id: paiementId });
 export const getRecuById = (id) => apiClient.get(`/recus/${id}`);
 export const getRecuByReservation = (reservationId) => apiClient.get(`/recus/reservation/${reservationId}`);
 export const downloadRecuPdf = (id, filename) => downloadProtectedFile(`/recus/${id}/download`, filename);

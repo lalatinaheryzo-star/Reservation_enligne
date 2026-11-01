@@ -82,9 +82,11 @@ export default function UserApp({ user, onLogout }) {
     // addReservation ajoute au state local — pas d'appel API (déjà créé par PaiementClient)
     addReservation(reservation);
     setMyResaIds((prev) => [...prev, resaId]);
-    setLastPaiement({ statut: reservation.paiement_statut || "Réussi" });
+    setLastPaiement({ statut: reservation.paiement_statut || "Statut indisponible" });
     setFlow(FLOW.CONFIRM);
-    toast.success("Paiement enregistré ! Réservation en attente de validation par le Président.");
+    if (reservation.paiement_statut === "En attente") {
+      toast.success("Réservation enregistrée. Paiement en attente de confirmation par la coopérative.");
+    }
   };
 
   const handleBackToVoyages = () => {
@@ -114,8 +116,20 @@ export default function UserApp({ user, onLogout }) {
               display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px" }}>
               <Ticket size={30} />
             </div>
-            <h3 style={{ fontSize:"1.2rem", marginBottom:6 }}>Paiement enregistré !</h3>
-            <p style={{ opacity:.8, fontSize:".85rem" }}>Le Président de la coopérative doit maintenant vérifier et valider votre réservation.</p>
+            <h3 style={{ fontSize:"1.2rem", marginBottom:6 }}>Réservation enregistrée</h3>
+            <p style={{ opacity:.8, fontSize:".85rem" }}>
+              {lastPaiement?.statut === "En attente"
+                ? "Le paiement en espèces est en attente de confirmation par la coopérative."
+                : lastPaiement?.statut === "Paiement non enregistré"
+                  ? "La réservation a été créée, mais aucun paiement n'a été enregistré. La place reste réservée en attente."
+                  : lastPaiement?.statut === "Paiement à vérifier"
+                    ? "La réservation a été créée, mais le paiement est en conflit. Vérifiez son statut auprès de la coopérative avant de réessayer."
+                    : lastPaiement?.statut === "Paiement non confirmé"
+                      ? "La réservation a été créée, mais le paiement n'a pas été confirmé. Vérifiez son statut auprès de la coopérative."
+                  : lastPaiement?.statut === "Résultat incertain"
+                    ? "La réservation a été créée, mais le résultat de la demande de paiement est incertain. Vérifiez vos réservations avant de réessayer."
+                    : "Vérifiez le statut du paiement auprès de la coopérative."}
+            </p>
           </div>
           <div style={{ padding:"24px 28px" }}>
             <div style={{ background:"#f8fafc", borderRadius:12, padding:"16px 18px", marginBottom:20 }}>
@@ -127,7 +141,7 @@ export default function UserApp({ user, onLogout }) {
                 ["Siège",    `Place ${selectedPlace?.numero_place}`],
                 ["Montant",  `${Number(selectedVoyage?.prix||0).toLocaleString()} Ar`],
                 ["Passager", `${user.prenom} ${user.nom}`],
-                ["Paiement", lastPaiement?.statut || "Réussi"],
+                ["Paiement", lastPaiement?.statut || "Statut indisponible"],
                 ["Réservation", "En attente de validation"],
               ].map(([k,v]) => (
                 <div key={k} style={{ display:"flex", justifyContent:"space-between", fontSize:".83rem", marginBottom:6 }}>

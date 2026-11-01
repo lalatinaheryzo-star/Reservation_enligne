@@ -51,7 +51,16 @@ export default function RecuVoyageur({ reservationId, onClose, onDownloaded }) {
     setError(null);
     getRecuByReservation(reservationId)
       .then((data) => { if (!cancelled) setRecu(data); })
-      .catch((err) => { if (!cancelled) setError(err.message || "Reçu introuvable."); })
+      .catch((err) => {
+        if (!cancelled) {
+          const message = err.status === 404
+            ? "Aucun reçu n'est disponible pour cette réservation."
+            : err.status === 403
+              ? "Accès refusé au reçu."
+              : err.message || "Impossible de récupérer le reçu.";
+          setError(message);
+        }
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [reservationId]);

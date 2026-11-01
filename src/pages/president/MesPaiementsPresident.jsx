@@ -24,7 +24,7 @@ export default function MesPaiementsPresident({ cooperative }) {
   const handleValidate = async (id) => {
     setSavingId(id);
     try { await updatePaiementStatutReal(id, "Réussi"); }
-    catch (err) { /* toast déjà géré par apiClient */ }
+    catch (err) { /* le contexte affiche l'erreur */ }
     finally { setSavingId(null); }
   };
 
@@ -76,7 +76,7 @@ export default function MesPaiementsPresident({ cooperative }) {
                       <td>{Number(p.montant || 0).toLocaleString()} Ar</td>
                       <td>{statusBadge(p.statut)}</td>
                       <td>
-                        {p.statut === "En attente" ? (
+                        {p.mode_paiement === "Espèces" && p.statut === "En attente" ? (
                           <button className="btn btn-primary btn-sm btn-icon" title="Valider" disabled={savingId === id} onClick={() => handleValidate(id)}>
                             <CheckCircle size={14} />
                           </button>

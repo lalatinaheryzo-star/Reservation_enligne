@@ -1,15 +1,30 @@
 // src/api/client.js
 // ============================================================
-//  Client HTTP minimal pour parler au serveur Express
-//  (dossier ../server / ../backend du dépôt).
-//
-//  Définissez l'URL de l'API dans un fichier .env à la racine
-//  du frontend :  REACT_APP_API_URL=http://localhost:4000/api
+//  Client HTTP double backend :
+//  - API_URL (Spring Boot : port 4000 par défaut) -> login, register, voyages, réservations, etc.
+//  - AUTH_API_URL (Serveur Express JS : port 4001 par défaut) -> mot de passe oublié & code vérification
 // ============================================================
-const API_URL = process.env.REACT_APP_API_URL || "https://serveur-springboot.onrender.com/api";
+
+const isLocalhost =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" ||
+   window.location.hostname === "127.0.0.1" ||
+   window.location.hostname === "");
+
+// En local, pointe par défaut vers les ports locaux configurés
+const DEFAULT_SPRING_URL = isLocalhost
+  ? "http://localhost:4000/api"
+  : "https://serveur-springboot.onrender.com/api";
+
+const DEFAULT_AUTH_URL = isLocalhost
+  ? "http://localhost:4001/api"
+  : "https://serveur-mail-voyage.onrender.com/api";
+
+const API_URL = process.env.REACT_APP_API_URL || DEFAULT_SPRING_URL;
+const AUTH_API_URL = process.env.REACT_APP_AUTH_URL || DEFAULT_AUTH_URL;
 const TOKEN_KEY = "voyagemada_token";
 
-export { API_URL };
+export { API_URL, AUTH_API_URL };
 
 let inMemoryToken = null;
 
@@ -33,18 +48,28 @@ export function getToken() {
   }
 }
 
-async function request(path, { method = "GET", body, headers = {} } = {}) {
+async function request(path, { method = "GET", body, headers = {} } = {}, baseUrl = API_URL) {
   const token = getToken();
 
-  const response = await fetch(`${API_URL}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch (err) {
+    // Message clair si le serveur cible n'est pas démarré
+    const isAuthServer = baseUrl === AUTH_API_URL;
+    const serverName = isAuthServer
+      ? "serveur JavaScript Node.js (port 4001)"
+      : "serveur Spring Boot (port 4000)";
+    throw new Error(`Impossible de contacter le ${serverName}. Assurez-vous qu'il est bien démarré.`);
+  }
 
   // 204 No Content
   if (response.status === 204) return null;
@@ -57,7 +82,11 @@ async function request(path, { method = "GET", body, headers = {} } = {}) {
   }
 
   if (!response.ok) {
-    const message = data?.error || `Erreur HTTP ${response.status}`;
+    const message =
+      data?.error ||
+      data?.message ||
+      (typeof data === "string" ? data : null) ||
+      `Erreur HTTP ${response.status}`;
     const error = new Error(message);
     error.status = response.status;
     throw error;
@@ -66,12 +95,19 @@ async function request(path, { method = "GET", body, headers = {} } = {}) {
   return data;
 }
 
+// Client principal (Spring Boot) : voyages, utilisateurs, réservations, paiements, etc.
 export const apiClient = {
-  get: (path) => request(path),
-  post: (path, body) => request(path, { method: "POST", body }),
-  put: (path, body) => request(path, { method: "PUT", body }),
-  patch: (path, body) => request(path, { method: "PATCH", body }),
-  delete: (path) => request(path, { method: "DELETE" }),
+  get: (path) => request(path, {}, API_URL),
+  post: (path, body) => request(path, { method: "POST", body }, API_URL),
+  put: (path, body) => request(path, { method: "PUT", body }, API_URL),
+  patch: (path, body) => request(path, { method: "PATCH", body }, API_URL),
+  delete: (path) => request(path, { method: "DELETE" }, API_URL),
+};
+
+// Client secondaire (Serveur Express Node.js) : mot de passe oublié & code de vérification
+export const authClient = {
+  get: (path) => request(path, {}, AUTH_API_URL),
+  post: (path, body) => request(path, { method: "POST", body }, AUTH_API_URL),
 };
 
 /**
@@ -92,7 +128,9 @@ export async function downloadProtectedFile(path, filename) {
     } catch {
       // corps non JSON (ex: PDF déjà en cours de génération)
     }
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);

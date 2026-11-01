@@ -19,7 +19,7 @@ export default function Paiements() {
   const [search, setSearch] = useState("");
   const [modal, setModal]   = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm]     = useState({ reservation_id: "", montant: "", mode_paiement: "Mvola", statut: "Réussi" });
+  const [form, setForm]     = useState({ reservation_id: "", montant: "", mode_paiement: "Espèces", statut: "En attente" });
 
   const resas = reservations.filter((r) => r.statut === "En attente" || r.statut === "Validée");
 
@@ -27,15 +27,15 @@ export default function Paiements() {
     e.preventDefault();
     setSaving(true);
     try {
-      await addPaiement({
+      const paiement = await addPaiement({
         reservation_id: form.reservation_id,
         montant: Number(form.montant),
         mode_paiement: form.mode_paiement,
         statut: form.statut,
       });
-      toast.success(form.statut === "Réussi" ? "Paiement enregistré — reçu généré !" : "Paiement enregistré.");
+      toast.success(`Paiement enregistré — statut : ${paiement.statut}.`);
       setModal(false);
-      setForm({ reservation_id: "", montant: "", mode_paiement: "Mvola", statut: "Réussi" });
+      setForm({ reservation_id: "", montant: "", mode_paiement: "Espèces", statut: "En attente" });
     } catch (err) {
       toast.error(err.message || "Erreur lors de l'enregistrement.");
     } finally {
@@ -131,20 +131,12 @@ export default function Paiements() {
                     <div className="form-group">
                       <label>Mode de paiement</label>
                       <select value={form.mode_paiement} onChange={(e) => setForm({ ...form, mode_paiement: e.target.value })}>
-                        <option>Mvola</option>
-                        <option>Orange Money</option>
-                        <option>Airtel Money</option>
                         <option>Espèces</option>
-                        <option>Virement</option>
                       </select>
                     </div>
                     <div className="form-group">
                       <label>Statut</label>
-                      <select value={form.statut} onChange={(e) => setForm({ ...form, statut: e.target.value })}>
-                        <option>Réussi</option>
-                        <option>Échoué</option>
-                        <option>En attente</option>
-                      </select>
+                      <input type="text" value="En attente — confirmation requise" disabled readOnly />
                     </div>
                   </div>
                 </div>

@@ -216,12 +216,6 @@ export function AppProvider({ children }) {
   const addPaiement = async (data) => {
     const item = await svc.createPaiement(data);
     setPaiements((prev) => [item, ...prev]);
-    if (data.statut === "Réussi") {
-      try {
-        const recu = await svc.createRecu(item.id_paiement || item.id);
-        setRecus((prev) => [recu, ...prev]);
-      } catch {}
-    }
     return item;
   };
   const removePaiement = async (id) => {
