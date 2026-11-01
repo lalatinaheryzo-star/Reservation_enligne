@@ -20,8 +20,8 @@ const DEFAULT_AUTH_URL = isLocalhost
   ? "http://localhost:4001/api"
   : "https://serveur-mail-voyage.onrender.com/api";
 
-const API_URL = process.env.REACT_APP_API_URL || DEFAULT_SPRING_URL;
-const AUTH_API_URL = process.env.REACT_APP_AUTH_URL || DEFAULT_AUTH_URL;
+const API_URL = (process.env.REACT_APP_API_URL || DEFAULT_SPRING_URL).replace(/\/+$/, "");
+const AUTH_API_URL = (process.env.REACT_APP_AUTH_URL || DEFAULT_AUTH_URL).replace(/\/+$/, "");
 const TOKEN_KEY = "voyagemada_token";
 
 export { API_URL, AUTH_API_URL };
@@ -50,10 +50,13 @@ export function getToken() {
 
 async function request(path, { method = "GET", body, headers = {} } = {}, baseUrl = API_URL) {
   const token = getToken();
+  const cleanBase = (baseUrl || API_URL).replace(/\/+$/, "");
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const fullUrl = `${cleanBase}${cleanPath}`;
 
   let response;
   try {
-    response = await fetch(`${baseUrl}${path}`, {
+    response = await fetch(fullUrl, {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -64,10 +67,10 @@ async function request(path, { method = "GET", body, headers = {} } = {}, baseUr
     });
   } catch (err) {
     // Message clair si le serveur cible n'est pas démarré
-    const isAuthServer = baseUrl === AUTH_API_URL;
+    const isAuthServer = cleanBase === AUTH_API_URL;
     const serverName = isAuthServer
-      ? "serveur JavaScript Node.js (port 4001)"
-      : "serveur Spring Boot (port 4000)";
+      ? "serveur JavaScript (port 4001 / serveur-mail-voyage.onrender.com)"
+      : "serveur Spring Boot (port 4000 / serveur-springboot.onrender.com)";
     throw new Error(`Impossible de contacter le ${serverName}. Assurez-vous qu'il est bien démarré.`);
   }
 
@@ -117,7 +120,9 @@ export const authClient = {
  */
 export async function downloadProtectedFile(path, filename) {
   const token = getToken();
-  const response = await fetch(`${API_URL}${path}`, {
+  const cleanBase = API_URL.replace(/\/+$/, "");
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const response = await fetch(`${cleanBase}${cleanPath}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!response.ok) {
